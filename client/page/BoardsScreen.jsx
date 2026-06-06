@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
@@ -7,18 +7,59 @@ import {
   createBoard,
   setCurrentBoard,
   addBoardMember,
+  removeBoardMember,
 } from '../redux/boardSlice.js'
 import Board from '../components/Board.jsx'
 import ActivityPanel from '../components/ActivityPanel.jsx'
 import axiosInstance from '../utils/axiosInstance'
+import socket from '../utils/socket'
 import { HiOutlineClock, HiOutlinePlus, HiOutlineUserAdd, HiOutlineFolder, HiOutlineTemplate, HiOutlineSparkles } from 'react-icons/hi'
 
 const BoardsScreen = () => {
   const dispatch = useDispatch()
   const navigate = useNavigate()
   const { boardId } = useParams()
-  const { boards, currentBoard, loading, error } = useSelector((state) => state.boards)
+  const { boards, currentBoard } = useSelector((state) => state.boards)
   const { tasks, onlineUsers } = useSelector((state) => state.tasks)
+  const currentUserId = localStorage.getItem('userId');
+
+  const getDeadlineInfo = (dueDate, status) => {
+    if (!dueDate) return null;
+    const due = new Date(dueDate);
+    const today = new Date();
+    due.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+
+    const diffTime = due.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const isDone = status === 'Done';
+
+    let text;
+    let isOverdue = false;
+    let className = 'text-slate-500 bg-slate-950/40';
+
+    if (diffDays < 0) {
+      isOverdue = !isDone;
+      text = `${Math.abs(diffDays)}d overdue`;
+      if (isOverdue) {
+        className = 'text-rose-400 bg-rose-500/10 border border-rose-500/20 font-bold';
+      }
+    } else if (diffDays === 0) {
+      text = 'Due Today';
+      if (!isDone) {
+        className = 'text-amber-400 bg-amber-500/10 border border-amber-500/20 font-bold';
+      }
+    } else if (diffDays === 1) {
+      text = 'Tomorrow';
+      if (!isDone) {
+        className = 'text-sky-400 bg-sky-500/10 border border-sky-500/20';
+      }
+    } else {
+      text = `${diffDays}d left`;
+    }
+
+    return { text, isOverdue, className };
+  };
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -32,6 +73,9 @@ const BoardsScreen = () => {
 
   // Toggle Activity feed
   const [isActivityOpen, setIsActivityOpen] = useState(true)
+
+  // Owner dashboard view state
+  const [showOwnerDashboard, setShowOwnerDashboard] = useState(false)
 
   useEffect(() => {
     dispatch(fetchBoards())
@@ -70,6 +114,21 @@ const BoardsScreen = () => {
     }
   }, [boardId])
 
+  // Eviction listener
+  useEffect(() => {
+    if (!boardId) return;
+    const handleEviction = (data) => {
+      if (data.boardId === boardId && data.memberId === currentUserId) {
+        alert('You have been removed from this board by the owner.');
+        navigate('/boards', { replace: true });
+      }
+    };
+    socket.on('memberRemoved', handleEviction);
+    return () => {
+      socket.off('memberRemoved', handleEviction);
+    };
+  }, [boardId, currentUserId, navigate]);
+
   const handleCreateBoard = async (e) => {
     e.preventDefault()
     if (!title.trim()) return
@@ -100,6 +159,16 @@ const BoardsScreen = () => {
       console.error('Invite member failed', err)
     }
   }
+
+  const handleRemoveMember = async (memberId) => {
+    if (!window.confirm('Are you sure you want to remove this member?')) return;
+    try {
+      await dispatch(removeBoardMember({ boardId, memberId })).unwrap();
+    } catch (err) {
+      console.error('Remove member failed', err);
+      alert(err.message || 'Failed to remove member.');
+    }
+  };
 
   // Filter users not on the current board
   const nonMembers = allUsers.filter(u => {
@@ -255,7 +324,8 @@ const BoardsScreen = () => {
     )
   }
 
-  // 2. Active Board Layout (If board selected)
+  const isOwner = currentBoard && (currentBoard.createdBy?._id === currentUserId || currentBoard.createdBy === currentUserId);
+
   return (
     <div className="flex flex-col xl:flex-row gap-6 w-full h-[calc(100vh-121px)] overflow-hidden">
       
@@ -263,15 +333,22 @@ const BoardsScreen = () => {
       <div className="flex-1 flex flex-col min-w-0 bg-slate-950/10">
         
         {/* Board Header Bar */}
-        <header className="rounded-2xl border border-white/10 bg-slate-900/40 p-4 backdrop-blur-md mb-4 flex flex-col md:flex-row gap-4 md:items-center md:justify-between flex-shrink-0">
+        <header className="relative z-20 rounded-2xl border border-white/10 bg-slate-900/40 p-4 backdrop-blur-md mb-4 flex flex-col md:flex-row gap-4 md:items-center md:justify-between flex-shrink-0">
           <div>
             <div className="flex items-center gap-2 text-slate-400">
               <HiOutlineTemplate className="h-4 w-4" />
               <span className="text-[9px] uppercase tracking-wider font-semibold">Active Space</span>
             </div>
             <h2 className="mt-1 text-xl font-bold text-white truncate">{currentBoard?.title || 'Loading Board...'}</h2>
+            {currentBoard && (
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-400">
+                <span>Workspace Owner: <strong className="text-sky-400">{currentBoard.createdBy?.name || 'Unknown'}</strong></span>
+                <span>Board Owner: <strong className="text-sky-400">{currentBoard.createdBy?.name || 'Unknown'}</strong></span>
+                <span>Created By: <strong className="text-sky-400">{currentBoard.createdBy?.name || 'Unknown'}</strong></span>
+              </div>
+            )}
             {currentBoard?.description && (
-              <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">{currentBoard.description}</p>
+              <p className="text-[10px] text-slate-400 mt-1 line-clamp-1">{currentBoard.description}</p>
             )}
           </div>
 
@@ -294,45 +371,61 @@ const BoardsScreen = () => {
               </span>
 
               {/* Add Member Dropdown Trigger */}
-              <div className="relative">
-                <button
-                  onClick={() => setIsInviteOpen(!isInviteOpen)}
-                  className="rounded bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 p-1 transition"
-                  title="Invite Teammate"
-                >
-                  <HiOutlineUserAdd className="h-3.5 w-3.5" />
-                </button>
+              {isOwner && (
+                <div className="relative">
+                  <button
+                    onClick={() => setIsInviteOpen(!isInviteOpen)}
+                    className="rounded bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 p-1 transition"
+                    title="Invite Teammate"
+                  >
+                    <HiOutlineUserAdd className="h-3.5 w-3.5" />
+                  </button>
 
-                {/* Invite Dropdown Panel */}
-                {isInviteOpen && (
-                  <div className="absolute right-0 mt-2 z-50 w-64 rounded-xl border border-white/10 bg-slate-900 p-3 shadow-2xl">
-                    <p className="text-[10px] font-semibold text-white mb-2">Invite Collaborator</p>
-                    <input
-                      value={inviteSearch}
-                      onChange={(e) => setInviteSearch(e.target.value)}
-                      placeholder="Search name or email..."
-                      className="w-full rounded-lg border border-white/5 bg-slate-950 px-2 py-1.5 text-[10px] text-white placeholder-slate-500 outline-none focus:border-sky-500 mb-2"
-                    />
-                    <div className="max-h-36 overflow-y-auto space-y-1">
-                      {nonMembers.length > 0 ? (
-                        nonMembers.map(u => (
-                          <div 
-                            key={u._id}
-                            onClick={() => handleInvite(u._id)}
-                            className="flex items-center justify-between rounded p-1.5 bg-slate-950/30 hover:bg-slate-950 border border-transparent hover:border-white/5 cursor-pointer transition"
-                          >
-                            <span className="text-[10px] text-slate-200 truncate pr-2">{u.name}</span>
-                            <span className="text-[9px] text-sky-400 font-bold hover:underline">Add</span>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-[9px] text-slate-500 text-center py-2">No other users found.</p>
-                      )}
+                  {/* Invite Dropdown Panel */}
+                  {isInviteOpen && (
+                    <div className="absolute right-0 mt-2 z-50 w-64 rounded-xl border border-white/10 bg-slate-900 p-3 shadow-2xl">
+                      <p className="text-[10px] font-semibold text-white mb-2">Invite Collaborator</p>
+                      <input
+                        value={inviteSearch}
+                        onChange={(e) => setInviteSearch(e.target.value)}
+                        placeholder="Search name or email..."
+                        className="w-full rounded-lg border border-white/5 bg-slate-950 px-2 py-1.5 text-[10px] text-white placeholder-slate-500 outline-none focus:border-sky-500 mb-2"
+                      />
+                      <div className="max-h-36 overflow-y-auto space-y-1">
+                        {nonMembers.length > 0 ? (
+                          nonMembers.map(u => (
+                            <div 
+                              key={u._id}
+                              onClick={() => handleInvite(u._id)}
+                              className="flex items-center justify-between rounded p-1.5 bg-slate-950/30 hover:bg-slate-950 border border-transparent hover:border-white/5 cursor-pointer transition"
+                            >
+                              <span className="text-[10px] text-slate-200 truncate pr-2">{u.name}</span>
+                              <span className="text-[9px] text-sky-400 font-bold hover:underline">Add</span>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-[9px] text-slate-500 text-center py-2">No other users found.</p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
             </div>
+
+            {/* Owner Dashboard Toggle */}
+            {isOwner && (
+              <button
+                onClick={() => setShowOwnerDashboard(!showOwnerDashboard)}
+                className={`inline-flex items-center gap-1 rounded-xl px-3 py-2 text-xs font-semibold transition border ${
+                  showOwnerDashboard
+                    ? 'border-sky-500/30 bg-sky-500/10 text-sky-400 font-bold'
+                    : 'border-white/10 bg-slate-900/60 text-slate-400 hover:text-white'
+                }`}
+              >
+                Dashboard
+              </button>
+            )}
 
             {/* Toggle right activity log */}
             <button
@@ -349,9 +442,101 @@ const BoardsScreen = () => {
           </div>
         </header>
 
-        {/* Board content */}
-        <div className="flex-1 overflow-hidden">
-          <Board boardId={boardId} />
+        {/* Board content or Owner Dashboard */}
+        <div className="flex-1 overflow-y-auto">
+          {showOwnerDashboard && isOwner ? (
+            <div className="space-y-6 p-4 bg-slate-900/40 rounded-2xl border border-white/5">
+              <div>
+                <h3 className="text-base font-bold text-white">Owner Dashboard & Member Management</h3>
+                <p className="text-xs text-slate-400 mt-1">Review team status, details of task assignments, and manage roles.</p>
+              </div>
+
+              {/* Members Control Table */}
+              <div className="space-y-3">
+                <h4 className="text-xs uppercase font-bold text-slate-400 tracking-wider">Workspace Members</h4>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {currentBoard?.members?.map((member) => {
+                    const isSelf = member._id === currentUserId;
+                    return (
+                      <div key={member._id} className="rounded-xl border border-white/5 bg-slate-950/40 p-3 flex justify-between items-center text-xs">
+                        <div>
+                          <p className="font-semibold text-slate-200">{member.name}</p>
+                          <p className="text-[10px] text-slate-500">{member.email}</p>
+                        </div>
+                        {!isSelf && (
+                          <button
+                            onClick={() => handleRemoveMember(member._id)}
+                            className="px-2.5 py-1 bg-rose-500/15 border border-rose-500/25 rounded-lg text-rose-400 hover:bg-rose-500 hover:text-white transition font-bold"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Tasks Progress Tracking Table */}
+              <div className="space-y-3">
+                <h4 className="text-xs uppercase font-bold text-slate-400 tracking-wider">Tasks Progress Tracking</h4>
+                <div className="overflow-x-auto rounded-xl border border-white/5 bg-slate-950/20">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-white/5 bg-slate-950/40 text-slate-400">
+                        <th className="p-3">Task Name</th>
+                        <th className="p-3">Assigned To</th>
+                        <th className="p-3">Progress</th>
+                        <th className="p-3">Deadline</th>
+                        <th className="p-3">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5 text-slate-300">
+                      {tasks.length > 0 ? (
+                        tasks.map((task) => (
+                          <tr key={task._id} className="hover:bg-white/5">
+                            <td className="p-3 font-semibold text-white truncate max-w-[200px]">{task.title}</td>
+                            <td className="p-3">{task.assignedTo?.name || 'Unassigned'}</td>
+                            <td className="p-3">
+                              <span className="px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 font-bold">
+                                {task.progress !== undefined ? task.progress : 0}%
+                              </span>
+                            </td>
+                            <td className="p-3">
+                              {task.dueDate ? (() => {
+                                const dl = getDeadlineInfo(task.dueDate, task.status);
+                                return (
+                                  <div className="flex flex-col gap-1">
+                                    <span>{new Date(task.dueDate).toLocaleDateString()}</span>
+                                    <span className={`text-[9px] px-1.5 py-0.5 rounded border border-white/5 w-max ${dl.className}`}>
+                                      {dl.text}
+                                    </span>
+                                  </div>
+                                );
+                              })() : <span className="text-slate-500">None</span>}
+                            </td>
+                            <td className="p-3">
+                              <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-400 uppercase font-semibold text-[9px]">
+                                {task.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="5" className="p-4 text-center text-slate-500">No tasks created.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="h-full overflow-hidden">
+              <Board boardId={boardId} />
+            </div>
+          )}
         </div>
       </div>
 

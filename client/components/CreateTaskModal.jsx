@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { createTask } from '../redux/taskSlice';
 import socket from '../utils/socket';
@@ -20,6 +20,7 @@ const CreateTaskModal = ({ isOpen, onClose, boardId, defaultStatus = 'Todo' }) =
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
     setFormData((prev) => ({
       ...prev,
       status: defaultStatus,

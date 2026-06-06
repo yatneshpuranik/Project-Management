@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
-import { HiOutlineAdjustments, HiOutlineUserGroup, HiOutlineBell, HiOutlineDatabase, HiOutlineChevronRight } from 'react-icons/hi';
+import { useState } from 'react';
+import { HiOutlineUserGroup, HiOutlineBell } from 'react-icons/hi';
 
 const SettingsScreen = () => {
-  const [theme, setTheme] = useState('dark');
   const [notifications, setNotifications] = useState({
     taskAssigned: true,
     taskMoved: true,
@@ -22,64 +21,13 @@ const SettingsScreen = () => {
         <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-sky-400">System Preferences</p>
         <h1 className="mt-2 text-3xl font-semibold text-white">Workspace Settings</h1>
         <p className="mt-1 text-xs text-slate-400">
-          Manage system controls, collaborative permissions, theme features, and live syncing.
+          Manage system controls, collaborative permissions, and live syncing.
         </p>
       </header>
 
       {/* Settings Sections */}
       <div className="space-y-6">
         
-        {/* Section 1: Visual Theme */}
-        <section className="rounded-2xl border border-white/10 bg-slate-900/20 p-6 backdrop-blur-sm space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/15">
-              <HiOutlineAdjustments className="h-5 w-5" />
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold text-white">Visual Customization</h2>
-              <p className="text-[10px] text-slate-400">Choose the styling appearance of your SaaS workspace.</p>
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <button
-              onClick={() => setTheme('dark')}
-              className={`rounded-xl border p-4 text-left transition ${
-                theme === 'dark'
-                  ? 'border-sky-500 bg-sky-500/5 text-white'
-                  : 'border-white/5 bg-slate-950/40 text-slate-400 hover:bg-slate-900/60'
-              }`}
-            >
-              <span className="block text-xs font-semibold">Deep Slate Dark</span>
-              <span className="mt-1 block text-[10px] text-slate-500">Premium dark tones with glowing blue highlights.</span>
-            </button>
-            
-            <button
-              onClick={() => setTheme('light')}
-              className={`rounded-xl border p-4 text-left transition ${
-                theme === 'light'
-                  ? 'border-sky-500 bg-sky-500/5 text-white'
-                  : 'border-white/5 bg-slate-950/40 text-slate-400 hover:bg-slate-900/60'
-              }`}
-            >
-              <span className="block text-xs font-semibold">Glassmorphic Light</span>
-              <span className="mt-1 block text-[10px] text-slate-500">Bright, clean theme utilizing frosted card backdrops.</span>
-            </button>
-
-            <button
-              onClick={() => setTheme('cyberpunk')}
-              className={`rounded-xl border p-4 text-left transition ${
-                theme === 'cyberpunk'
-                  ? 'border-sky-500 bg-sky-500/5 text-white'
-                  : 'border-white/5 bg-slate-950/40 text-slate-400 hover:bg-slate-900/60'
-              }`}
-            >
-              <span className="block text-xs font-semibold">Neon Terminal</span>
-              <span className="mt-1 block text-[10px] text-slate-500">Retro digital styles with high contrast purple accents.</span>
-            </button>
-          </div>
-        </section>
-
         {/* Section 2: Permissions */}
         <section className="rounded-2xl border border-white/10 bg-slate-900/20 p-6 backdrop-blur-sm space-y-4">
           <div className="flex items-center gap-3">
@@ -149,27 +97,6 @@ const SettingsScreen = () => {
                 </span>
               </div>
             ))}
-          </div>
-        </section>
-
-        {/* Section 4: Data Syncing */}
-        <section className="rounded-2xl border border-white/10 bg-slate-900/20 p-6 backdrop-blur-sm space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/15">
-              <HiOutlineDatabase className="h-5 w-5" />
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold text-white">Database & Socket Connection</h2>
-              <p className="text-[10px] text-slate-400">Check server synchronization parameters.</p>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/40 border border-white/5 text-xs">
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
-              <span className="font-semibold text-white">Websocket Connected</span>
-            </div>
-            <span className="text-[10px] text-slate-500">Port 8000 (ws://localhost:8000)</span>
           </div>
         </section>
 

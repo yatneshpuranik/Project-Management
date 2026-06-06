@@ -26,8 +26,8 @@ npm install socket.io http
 ```
 MONGODB_URI=mongodb://localhost:27017/kanban-board
 JWT_SECRET=your-secret-key-here
-PORT=5000
-FRONTEND_URL=http://localhost:5173
+PORT=PORT_NUMBER
+FRONTEND_URL= FRONT_END_URL
 NODE_ENV=development
 ```
 
@@ -36,7 +36,7 @@ NODE_ENV=development
 npm run dev
 ```
 
-Server will run on: http://localhost:5000
+Server will run on: http://localhost:PORT_NUMBER
 
 ---
 

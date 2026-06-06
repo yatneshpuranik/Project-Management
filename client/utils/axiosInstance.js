@@ -34,7 +34,7 @@ axiosInstance.interceptors.response.use(
       localStorage.removeItem('token');
       try {
         axios.post(`${BASE_URL}/api/user/logout`, {}, { withCredentials: true }).catch(() => {})
-      } catch (e) {
+      } catch {
         // ignore logout errors
       }
       if (window.location.pathname !== '/login') {

@@ -1,5 +1,4 @@
-import React from 'react'
-import { HiOutlineUser, HiOutlineClock, HiOutlineSparkles } from 'react-icons/hi'
+import { HiOutlineClock, HiOutlineSparkles } from 'react-icons/hi'
 
 const ActivityPanel = ({ tasks = [], onlineUsers = [] }) => {
   const recentActions = tasks.slice(0, 6)
@@ -67,11 +66,23 @@ const ActivityPanel = ({ tasks = [], onlineUsers = [] }) => {
                     <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-sky-500/10 text-sky-400 text-xs font-bold border border-sky-500/15">
                       {user.userName?.charAt(0).toUpperCase() || 'U'}
                     </span>
-                    <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 border border-slate-950"></span>
+                    <span className={`absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-slate-950 ${
+                      user.status === 'Typing...' ? 'bg-sky-400 animate-pulse' : 'bg-emerald-500'
+                    }`}></span>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-slate-200 truncate">{user.userName}</p>
-                    <p className="text-[9px] text-slate-500 truncate">Viewing this board</p>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex justify-between items-center gap-2">
+                      <p className="text-xs font-semibold text-slate-200 truncate">{user.userName}</p>
+                      <span className="text-[8px] text-slate-500">
+                        {user.lastActive ? new Date(user.lastActive).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                      </span>
+                    </div>
+                    <p className="text-[9px] text-slate-400 truncate">
+                      {user.viewingTask ? `Viewing: ${user.viewingTask}` : 'Viewing board'}
+                    </p>
+                    <p className="text-[8px] text-sky-400 font-medium">
+                      Status: {user.status || 'Online'}
+                    </p>
                   </div>
                 </div>
               ))

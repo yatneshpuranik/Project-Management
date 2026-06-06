@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import axiosInstance from '../utils/axiosInstance';
 
 const Profile = () => {
-  const [user, setUser] = useState(null);
+  const [, setUser] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -12,10 +12,6 @@ const Profile = () => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    fetchUserProfile();
-  }, []);
 
   const fetchUserProfile = async () => {
     try {
@@ -36,6 +32,10 @@ const Profile = () => {
     }
   };
 
+  useEffect(() => {
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
+    fetchUserProfile();
+  }, []);
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({

@@ -1,4 +1,3 @@
-import React from 'react'
 import { useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 
@@ -51,12 +50,12 @@ const ProfileScreen = () => {
                 <p className="mt-2 text-lg font-semibold text-white">{user.name}</p>
               </div>
               <div className="rounded-3xl bg-slate-950/80 p-5">
-                <p className="text-sm text-slate-400">User ID</p>
-                <p className="mt-2 text-lg font-semibold text-white">{user._id}</p>
+                <p className="text-sm text-slate-400">Email</p>
+                <p className="mt-2 text-lg font-semibold text-white">{user.email}</p>
               </div>
               <div className="rounded-3xl bg-slate-950/80 p-5">
                 <p className="text-sm text-slate-400">Joined</p>
-                <p className="mt-2 text-lg font-semibold text-white">{new Date(user.createdAt || Date.now()).toLocaleDateString()}</p>
+                <p className="mt-2 text-lg font-semibold text-white">{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</p>
               </div>
             </div>
           </div>

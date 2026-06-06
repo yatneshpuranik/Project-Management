@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   fetchTasksByBoard,
@@ -29,11 +29,15 @@ const Board = ({ boardId }) => {
 
     dispatch(fetchTasksByBoard(boardId));
 
-    socket.emit('join-board', {
-      boardId,
-      userId: localStorage.getItem('userId'),
-      userName: localStorage.getItem('userName'),
-    });
+    const joinRoom = () => {
+      socket.emit('join-board', {
+        boardId,
+        userId: localStorage.getItem('userId'),
+        userName: localStorage.getItem('userName'),
+      });
+    };
+
+    joinRoom();
 
     const handleOnlineUsers = (data) => {
       dispatch(setOnlineUsers(data.users || []));
@@ -76,6 +80,11 @@ const Board = ({ boardId }) => {
       }
     };
 
+    const handleConnect = () => {
+      joinRoom();
+    };
+
+    socket.on('connect', handleConnect);
     socket.on('online-users', handleOnlineUsers);
     socket.on('task-created', handleTaskCreated);
     socket.on('task-updated', handleTaskUpdated);
@@ -89,6 +98,7 @@ const Board = ({ boardId }) => {
         boardId,
         userId: localStorage.getItem('userId'),
       });
+      socket.off('connect', handleConnect);
       socket.off('online-users', handleOnlineUsers);
       socket.off('task-created', handleTaskCreated);
       socket.off('task-updated', handleTaskUpdated);

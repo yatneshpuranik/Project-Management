@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import axiosInstance from '../utils/axiosInstance'
 
 const AllUser = () => {
@@ -63,10 +63,7 @@ const AllUser = () => {
                   </div>
                   <div className="mt-5 space-y-2 text-sm text-slate-400">
                     <p>
-                      <span className="text-slate-300">ID:</span> {user._id}
-                    </p>
-                    <p>
-                      <span className="text-slate-300">Joined:</span> {new Date(user.createdAt || Date.now()).toLocaleDateString()}
+                      <span className="text-slate-300">Joined:</span> {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
                     </p>
                   </div>
                 </article>

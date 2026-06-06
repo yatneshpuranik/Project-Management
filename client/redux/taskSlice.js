@@ -104,7 +104,7 @@ const taskSlice = createSlice({
       state.editingUsers[taskId] = { userId, userName };
     },
     removeEditingUser: (state, action) => {
-      const { taskId, userId } = action.payload;
+      const { taskId } = action.payload;
       if (state.editingUsers[taskId]) {
         delete state.editingUsers[taskId];
       }

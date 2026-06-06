@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react'
-import { useDispatch } from 'react-redux'
+import { useEffect, useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
 import { setUser } from '../redux/userSlice.js'
 import axiosInstance from '../utils/axiosInstance'
 import { Routes, Route, Navigate } from 'react-router-dom'
@@ -17,11 +17,7 @@ import SettingsScreen from '../page/SettingsScreen.jsx'
 
 const App = () => {
   const dispatch = useDispatch()
-  const [darkMode, setDarkMode] = useState(() => {
-    return localStorage.getItem('theme') !== 'light'
-  })
-  const token = Boolean(localStorage.getItem('token'))
-
+  const { user } = useSelector((state) => state.user)
   const [authChecked, setAuthChecked] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
@@ -39,7 +35,8 @@ const App = () => {
       try {
         const result = await axiosInstance.get('/user/me')
         dispatch(setUser(result.data.user))
-      } catch (err) {
+      } catch {
+        localStorage.removeItem('token')
         dispatch(setUser(null))
       } finally {
         setAuthChecked(true)
@@ -51,22 +48,17 @@ const App = () => {
 
   useEffect(() => {
     const root = window.document.documentElement
-    if (darkMode) {
-      root.classList.add('dark')
-      localStorage.setItem('theme', 'dark')
-    } else {
-      root.classList.remove('dark')
-      localStorage.setItem('theme', 'light')
-    }
-  }, [darkMode])
+    root.classList.add('dark')
+    localStorage.setItem('theme', 'dark')
+  }, [])
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col overflow-hidden">
-      <Navbar darkMode={darkMode} setDarkMode={setDarkMode} toggleSidebar={toggleSidebar} />
+      <Navbar toggleSidebar={toggleSidebar} />
       {authChecked ? (
         <Routes>
           <Route path='/' element={<Home />} />
-          <Route path='/login' element={token ? <Navigate to='/boards' replace /> : <LoginScreen />} />
+          <Route path='/login' element={user ? <Navigate to='/boards' replace /> : <LoginScreen />} />
           
           {/* Protected Area Layout */}
           <Route
