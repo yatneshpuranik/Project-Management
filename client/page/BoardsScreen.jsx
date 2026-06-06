@@ -1,0 +1,371 @@
+import React, { useEffect, useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { useNavigate, useParams } from 'react-router-dom'
+import {
+  fetchBoards,
+  fetchBoardById,
+  createBoard,
+  setCurrentBoard,
+  addBoardMember,
+} from '../redux/boardSlice.js'
+import Board from '../components/Board.jsx'
+import ActivityPanel from '../components/ActivityPanel.jsx'
+import axiosInstance from '../utils/axiosInstance'
+import { HiOutlineClock, HiOutlinePlus, HiOutlineUserAdd, HiOutlineFolder, HiOutlineTemplate, HiOutlineSparkles } from 'react-icons/hi'
+
+const BoardsScreen = () => {
+  const dispatch = useDispatch()
+  const navigate = useNavigate()
+  const { boardId } = useParams()
+  const { boards, currentBoard, loading, error } = useSelector((state) => state.boards)
+  const { tasks, onlineUsers } = useSelector((state) => state.tasks)
+
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [isCreating, setIsCreating] = useState(false)
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+
+  // Invite member state
+  const [allUsers, setAllUsers] = useState([])
+  const [inviteSearch, setInviteSearch] = useState('')
+  const [isInviteOpen, setIsInviteOpen] = useState(false)
+
+  // Toggle Activity feed
+  const [isActivityOpen, setIsActivityOpen] = useState(true)
+
+  useEffect(() => {
+    dispatch(fetchBoards())
+  }, [dispatch])
+
+  useEffect(() => {
+    if (boardId) {
+      dispatch(fetchBoardById(boardId))
+    }
+  }, [boardId, dispatch])
+
+  useEffect(() => {
+    if (!boardId && boards.length > 0) {
+      // Don't auto-redirect to first board so the user can see the main boards directory/dashboard
+    }
+  }, [boardId, boards])
+
+  useEffect(() => {
+    if (!boardId && currentBoard) {
+      dispatch(setCurrentBoard(null))
+    }
+  }, [boardId, currentBoard, dispatch])
+
+  // Fetch all users for membership invite
+  useEffect(() => {
+    if (boardId) {
+      const loadUsers = async () => {
+        try {
+          const response = await axiosInstance.get('/user/all-users')
+          setAllUsers(response.data.users || [])
+        } catch (e) {
+          console.error(e)
+        }
+      }
+      loadUsers()
+    }
+  }, [boardId])
+
+  const handleCreateBoard = async (e) => {
+    e.preventDefault()
+    if (!title.trim()) return
+    setIsCreating(true)
+    try {
+      const resultAction = await dispatch(
+        createBoard({ title: title.trim(), description: description.trim() })
+      )
+      if (createBoard.fulfilled.match(resultAction)) {
+        setTitle('')
+        setDescription('')
+        setIsCreateModalOpen(false)
+        navigate(`/boards/${resultAction.payload._id}`)
+      }
+    } catch (err) {
+      console.error('Error creating board:', err)
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  const handleInvite = async (userToAddId) => {
+    try {
+      await dispatch(addBoardMember({ boardId, memberId: userToAddId }))
+      setIsInviteOpen(false)
+      setInviteSearch('')
+    } catch (err) {
+      console.error('Invite member failed', err)
+    }
+  }
+
+  // Filter users not on the current board
+  const nonMembers = allUsers.filter(u => {
+    const isMember = currentBoard?.members?.some(m => m._id === u._id)
+    const isCreator = currentBoard?.createdBy?._id === u._id
+    const matchesSearch = u.name?.toLowerCase().includes(inviteSearch.toLowerCase()) || 
+                          u.email?.toLowerCase().includes(inviteSearch.toLowerCase())
+    return !isMember && !isCreator && matchesSearch
+  })
+
+  // 1. Boards Directory Dashboard (If no board selected)
+  if (!boardId) {
+    return (
+      <div className="space-y-8 max-w-full">
+        {/* Dash Header */}
+        <header className="rounded-2xl border border-white/10 bg-slate-900/40 p-6 backdrop-blur-md">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-sky-400">Workspace Dashboard</p>
+              <h1 className="mt-2 text-3xl font-semibold text-white">Project Boards</h1>
+              <p className="mt-1 text-xs text-slate-400">
+                Review available board workspaces, view team participation, and create new collaborative spaces.
+              </p>
+            </div>
+            
+            {/* Quick Stats Grid */}
+            <div className="flex gap-4">
+              <div className="rounded-xl bg-slate-900/60 border border-white/5 px-4 py-2 text-center">
+                <span className="text-[9px] uppercase tracking-wider text-slate-500 block">Total Boards</span>
+                <span className="text-xl font-bold text-white mt-1 block">{boards.length}</span>
+              </div>
+              <div className="rounded-xl bg-slate-900/60 border border-white/5 px-4 py-2 text-center">
+                <span className="text-[9px] uppercase tracking-wider text-slate-500 block">Collaboration Status</span>
+                <span className="text-xl font-bold text-sky-400 mt-1 block flex items-center gap-1 justify-center">
+                  <HiOutlineSparkles className="h-4 w-4" /> Active
+                </span>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Boards Grid */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400">All Workspaces</h2>
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white px-4 py-2 text-xs font-semibold shadow-lg shadow-sky-500/10 transition"
+            >
+              <HiOutlinePlus className="h-4 w-4" /> Create Board
+            </button>
+          </div>
+
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {boards.map((board) => (
+              <div
+                key={board._id}
+                onClick={() => navigate(`/boards/${board._id}`)}
+                className="group relative flex flex-col justify-between rounded-2xl border border-white/10 bg-slate-900/20 p-5 hover:border-slate-700/60 hover:bg-slate-900/30 cursor-pointer shadow-md transition hover:-translate-y-0.5"
+              >
+                <div>
+                  <div className="flex items-center gap-2 text-slate-400 mb-3">
+                    <HiOutlineFolder className="h-5 w-5 text-sky-500" />
+                    <span className="text-[10px] uppercase tracking-wider font-semibold">Workspace</span>
+                  </div>
+                  <h3 className="text-sm font-semibold text-white group-hover:text-sky-400 transition truncate">{board.title}</h3>
+                  <p className="mt-1 text-[11px] text-slate-400 line-clamp-2 leading-relaxed min-h-[32px]">{board.description || 'No description provided.'}</p>
+                </div>
+
+                <div className="mt-5 pt-3 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-500">
+                  <div className="flex -space-x-1.5 overflow-hidden">
+                    {board.members?.slice(0, 3).map((member, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-gradient-to-br from-slate-800 to-slate-700 text-white text-[9px] font-bold border border-slate-950"
+                        title={member.name}
+                      >
+                        {member.name?.charAt(0).toUpperCase()}
+                      </span>
+                    ))}
+                    {board.members?.length > 3 && (
+                      <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-slate-800 text-slate-400 text-[8px] font-semibold border border-slate-950">
+                        +{board.members.length - 3}
+                      </span>
+                    )}
+                  </div>
+                  <span>{board.members?.length || 0} participants</span>
+                </div>
+              </div>
+            ))}
+
+            {/* Create Board Inline Action */}
+            <div
+              onClick={() => setIsCreateModalOpen(true)}
+              className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/15 bg-transparent p-6 hover:border-sky-500/40 hover:bg-sky-500/5 cursor-pointer text-slate-400 hover:text-sky-400 transition min-h-[160px]"
+            >
+              <HiOutlinePlus className="h-6 w-6 mb-2" />
+              <span className="text-xs font-semibold">Add New Workspace</span>
+              <span className="text-[10px] text-slate-500 mt-1">Start tracking dynamic boards</span>
+            </div>
+          </div>
+        </section>
+
+        {/* Create Board Modal */}
+        {isCreateModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl relative">
+              <h3 className="text-base font-semibold text-white mb-2">Create New Workspace</h3>
+              <p className="text-[11px] text-slate-400 mb-4">Set up board details. Collaborators can join via invitation.</p>
+              
+              <form onSubmit={handleCreateBoard} className="space-y-4">
+                <div>
+                  <label className="block text-xs text-slate-300 font-semibold mb-1">Title</label>
+                  <input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Workspace name, e.g., Sprint Plan"
+                    required
+                    className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3.5 py-2.5 text-xs text-slate-100 outline-none focus:border-sky-500 transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-300 font-semibold mb-1">Description</label>
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={3}
+                    placeholder="Summary of scope..."
+                    className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3.5 py-2.5 text-xs text-slate-100 outline-none focus:border-sky-500 transition"
+                  />
+                </div>
+                <div className="flex gap-2 justify-end pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreateModalOpen(false)}
+                    className="rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 px-4 py-2 text-xs font-semibold text-slate-300 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isCreating}
+                    className="rounded-xl bg-sky-500 hover:bg-sky-400 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-sky-500/20 disabled:opacity-60 transition"
+                  >
+                    {isCreating ? 'Creating...' : 'Create Workspace'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // 2. Active Board Layout (If board selected)
+  return (
+    <div className="flex flex-col xl:flex-row gap-6 w-full h-[calc(100vh-121px)] overflow-hidden">
+      
+      {/* Center Main Board Area */}
+      <div className="flex-1 flex flex-col min-w-0 bg-slate-950/10">
+        
+        {/* Board Header Bar */}
+        <header className="rounded-2xl border border-white/10 bg-slate-900/40 p-4 backdrop-blur-md mb-4 flex flex-col md:flex-row gap-4 md:items-center md:justify-between flex-shrink-0">
+          <div>
+            <div className="flex items-center gap-2 text-slate-400">
+              <HiOutlineTemplate className="h-4 w-4" />
+              <span className="text-[9px] uppercase tracking-wider font-semibold">Active Space</span>
+            </div>
+            <h2 className="mt-1 text-xl font-bold text-white truncate">{currentBoard?.title || 'Loading Board...'}</h2>
+            {currentBoard?.description && (
+              <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">{currentBoard.description}</p>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Board Members list */}
+            <div className="flex items-center gap-1 bg-slate-950/80 rounded-xl px-2 py-1.5 border border-white/5">
+              <div className="flex -space-x-1">
+                {currentBoard?.members?.slice(0, 4).map((member, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex h-4.5 w-4.5 items-center justify-center rounded-md bg-slate-800 text-white text-[8px] font-bold border border-slate-900"
+                    title={member.name}
+                  >
+                    {member.name?.charAt(0).toUpperCase()}
+                  </span>
+                ))}
+              </div>
+              <span className="text-[9px] text-slate-400 px-1">
+                {currentBoard?.members?.length || 0} joined
+              </span>
+
+              {/* Add Member Dropdown Trigger */}
+              <div className="relative">
+                <button
+                  onClick={() => setIsInviteOpen(!isInviteOpen)}
+                  className="rounded bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 p-1 transition"
+                  title="Invite Teammate"
+                >
+                  <HiOutlineUserAdd className="h-3.5 w-3.5" />
+                </button>
+
+                {/* Invite Dropdown Panel */}
+                {isInviteOpen && (
+                  <div className="absolute right-0 mt-2 z-50 w-64 rounded-xl border border-white/10 bg-slate-900 p-3 shadow-2xl">
+                    <p className="text-[10px] font-semibold text-white mb-2">Invite Collaborator</p>
+                    <input
+                      value={inviteSearch}
+                      onChange={(e) => setInviteSearch(e.target.value)}
+                      placeholder="Search name or email..."
+                      className="w-full rounded-lg border border-white/5 bg-slate-950 px-2 py-1.5 text-[10px] text-white placeholder-slate-500 outline-none focus:border-sky-500 mb-2"
+                    />
+                    <div className="max-h-36 overflow-y-auto space-y-1">
+                      {nonMembers.length > 0 ? (
+                        nonMembers.map(u => (
+                          <div 
+                            key={u._id}
+                            onClick={() => handleInvite(u._id)}
+                            className="flex items-center justify-between rounded p-1.5 bg-slate-950/30 hover:bg-slate-950 border border-transparent hover:border-white/5 cursor-pointer transition"
+                          >
+                            <span className="text-[10px] text-slate-200 truncate pr-2">{u.name}</span>
+                            <span className="text-[9px] text-sky-400 font-bold hover:underline">Add</span>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-[9px] text-slate-500 text-center py-2">No other users found.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Toggle right activity log */}
+            <button
+              onClick={() => setIsActivityOpen(!isActivityOpen)}
+              className={`inline-flex items-center gap-1 rounded-xl px-3 py-2 text-xs font-semibold transition border ${
+                isActivityOpen 
+                  ? 'border-sky-500/30 bg-sky-500/10 text-sky-400' 
+                  : 'border-white/10 bg-slate-900/60 text-slate-400 hover:text-white'
+              }`}
+            >
+              <HiOutlineClock className="h-4 w-4" />
+              <span className="hidden sm:inline">Activity Feed</span>
+            </button>
+          </div>
+        </header>
+
+        {/* Board content */}
+        <div className="flex-1 overflow-hidden">
+          <Board boardId={boardId} />
+        </div>
+      </div>
+
+      {/* Dockable Right Activity Panel */}
+      {isActivityOpen && (
+        <aside className="w-full xl:w-76 flex-shrink-0 flex flex-col h-full bg-slate-950 border-l border-white/10 overflow-hidden rounded-2xl xl:rounded-none">
+          <div className="flex-1 overflow-y-auto p-4 xl:p-0">
+            <ActivityPanel tasks={tasks} onlineUsers={onlineUsers} />
+          </div>
+        </aside>
+      )}
+
+    </div>
+  )
+}
+
+export default BoardsScreen
