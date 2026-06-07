@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { setUser } from '../redux/userSlice.js'
 import axiosInstance from '../utils/axiosInstance'
-import { connectSocket, disconnectSocket } from '../utils/socket'
+import socket, { connectSocket, disconnectSocket } from '../utils/socket'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import ProfileScreen from '../page/ProfileScreen.jsx'
 import LoginScreen from '../page/LoginScreen.jsx'
@@ -36,9 +36,11 @@ const App = () => {
 
       try {
         const result = await axiosInstance.get('/user/me')
+        localStorage.setItem('userRole', result.data.user.role || 'MEMBER')
         dispatch(setUser(result.data.user))
       } catch {
         localStorage.removeItem('token')
+        localStorage.removeItem('userRole')
         dispatch(setUser(null))
       } finally {
         setAuthChecked(true)
@@ -46,6 +48,20 @@ const App = () => {
     }
 
     initializeAuth()
+  }, [dispatch])
+
+  useEffect(() => {
+    const handleBlocked = (data) => {
+      alert(`Your account has been blocked. Reason: ${data?.reason || 'No reason specified'}`)
+      localStorage.clear()
+      dispatch(setUser(null))
+      window.location.href = '/login'
+    }
+
+    socket.on('blocked', handleBlocked)
+    return () => {
+      socket.off('blocked', handleBlocked)
+    }
   }, [dispatch])
 
   useEffect(() => {

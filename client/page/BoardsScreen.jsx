@@ -171,6 +171,21 @@ const BoardsScreen = () => {
     }
   };
 
+  const handleBlockMember = async (userId, userName) => {
+    const reason = window.prompt(`Enter block reason for ${userName}:`, 'Violating workspace policy');
+    if (reason === null) return;
+    try {
+      await axiosInstance.post(`/user/block/${userId}`, { reason });
+      alert('User blocked successfully.');
+      if (boardId) {
+        dispatch(fetchBoardById(boardId));
+      }
+    } catch (err) {
+      console.error('Block member failed', err);
+      alert(err.response?.data?.message || 'Failed to block member.');
+    }
+  };
+
   // Filter users not on the current board
   const nonMembers = allUsers.filter(u => {
     const isMember = currentBoard?.members?.some(m => m._id === u._id)
@@ -465,12 +480,22 @@ const BoardsScreen = () => {
                           <p className="text-[10px] text-slate-500">{member.email}</p>
                         </div>
                         {!isSelf && (
-                          <button
-                            onClick={() => handleRemoveMember(member._id)}
-                            className="px-2.5 py-1 bg-rose-500/15 border border-rose-500/25 rounded-lg text-rose-400 hover:bg-rose-500 hover:text-white transition font-bold"
-                          >
-                            Remove
-                          </button>
+                          <div className="flex gap-1.5">
+                            <button
+                              onClick={() => handleRemoveMember(member._id)}
+                              className="px-2.5 py-1 bg-rose-500/15 border border-rose-500/25 rounded-lg text-rose-400 hover:bg-rose-500 hover:text-white transition font-bold"
+                            >
+                              Remove
+                            </button>
+                            {member.role !== 'OWNER' && (
+                              <button
+                                onClick={() => handleBlockMember(member._id, member.name)}
+                                className="px-2.5 py-1 bg-red-600/20 border border-red-500/30 rounded-lg text-red-400 hover:bg-red-600 hover:text-white transition font-bold"
+                              >
+                                Block
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
                     );

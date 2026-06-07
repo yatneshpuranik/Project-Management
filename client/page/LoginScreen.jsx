@@ -50,6 +50,7 @@ const LoginScreen = () => {
           localStorage.setItem('userId', result.data.user._id)
           localStorage.setItem('userName', result.data.user.name)
           localStorage.setItem('userEmail', result.data.user.email)
+          localStorage.setItem('userRole', result.data.user.role || 'MEMBER')
           dispatch(setUser(result.data.user))
           navigate('/boards')
         }, 1200)
@@ -58,6 +59,7 @@ const LoginScreen = () => {
         localStorage.setItem('userId', result.data.user._id)
         localStorage.setItem('userName', result.data.user.name)
         localStorage.setItem('userEmail', result.data.user.email)
+        localStorage.setItem('userRole', result.data.user.role || 'MEMBER')
         dispatch(setUser(result.data.user))
         navigate('/boards')
       }
