@@ -136,7 +136,7 @@ export const encryptUserIds = (data) => {
       if (Object.prototype.hasOwnProperty.call(obj, key)) {
         if (key.endsWith('Id')) {
           obj[key] = encryptId(obj[key]);
-        } else if (['createdBy', 'assignedTo', 'recipient', 'sender', 'members', 'collaborators'].includes(key)) {
+        } else if (['createdBy', 'assignedTo', 'recipient', 'sender', 'members', 'collaborators', 'replyTo', 'mentions'].includes(key)) {
           obj[key] = encryptUserIds(obj[key]);
         } else if (key === 'comments' || key === 'messages') {
           obj[key] = obj[key].map(c => {

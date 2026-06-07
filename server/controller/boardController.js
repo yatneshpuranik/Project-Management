@@ -51,8 +51,8 @@ export const getBoards = async (req, res) => {
     const boards = await Board.find({
       $or: [{ createdBy: userId }, { members: userId }],
     })
-      .populate('createdBy', 'name email avatar')
-      .populate('members', 'name email avatar')
+      .populate('createdBy', 'name email avatar role presenceStatus lastActive')
+      .populate('members', 'name email avatar role presenceStatus lastActive')
       .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -75,8 +75,8 @@ export const getBoardById = async (req, res) => {
     }
 
     const board = await Board.findById(boardId)
-      .populate('createdBy', 'name email avatar')
-      .populate('members', 'name email avatar');
+      .populate('createdBy', 'name email avatar role presenceStatus lastActive')
+      .populate('members', 'name email avatar role presenceStatus lastActive');
 
     if (!board) {
       return res.status(404).json({ message: 'Board not found' });
