@@ -1,30 +1,20 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { updateTask } from '../redux/taskSlice';
-import axiosInstance from '../utils/axiosInstance';
-import socket from '../utils/socket';
-import {
-  HiOutlineX,
-  HiOutlineCheck,
-  HiOutlineChatAlt,
-  HiOutlinePencil,
-  HiOutlineTrash,
-  HiOutlineUserGroup,
-} from 'react-icons/hi';
+import { deleteTask, updateTask } from '../redux/taskSlice';
+import { HiOutlineX, HiOutlineCheck, HiOutlineTrash } from 'react-icons/hi';
 import { toast } from '../utils/toast';
+import socket from '../utils/socket';
 
 const EditTaskModal = ({ isOpen, onClose, task, boardId }) => {
   const dispatch = useDispatch();
+  const { user } = useSelector((state) => state.user);
   const currentBoard = useSelector((state) => state.boards.currentBoard);
-  const currentUserId = localStorage.getItem('userId');
-  const currentUserName = localStorage.getItem('userName');
-  
+  const currentUserId = user?._id || localStorage.getItem('userId');
   const isOwner =
     currentBoard &&
     (currentBoard.createdBy?._id === currentUserId || currentBoard.createdBy === currentUserId);
   const members = currentBoard?.members || [];
 
-  // Form states
   const [title, setTitle] = useState(task.title || '');
   const [description, setDescription] = useState(task.description || '');
   const [priority, setPriority] = useState(task.priority || 'Low');
@@ -37,166 +27,30 @@ const EditTaskModal = ({ isOpen, onClose, task, boardId }) => {
     task.assignedTo?._id || task.assignedTo || ''
   );
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  // Chat states
-  const [messages, setMessages] = useState([]);
-  const [newMessage, setNewMessage] = useState('');
-  const [taskOnlineUsers, setTaskOnlineUsers] = useState([]);
-  const [typingUsers, setTypingUsers] = useState({}); // { userId: userName }
-  const [editingMessageId, setEditingMessageId] = useState(null);
-  const [editingMessageText, setEditingMessageText] = useState('');
-  const chatEndRef = useRef(null);
-  const typingTimeoutRef = useRef(null);
-
-  // Load chat history and join room
+  // Sync form state when the task opens
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !task) return;
 
-    const fetchMessages = async () => {
-      try {
-        const response = await axiosInstance.get(`/tasks/${task._id}/messages`);
-        setMessages(response.data.messages || []);
-      } catch (err) {
-        console.error('Error fetching chat history:', err);
-      }
-    };
-    fetchMessages();
+    setTitle(task.title || '');
+    setDescription(task.description || '');
+    setPriority(task.priority || 'Low');
+    setDueDate(task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '');
+    setStatus(task.status || 'Todo');
+    setProgress(task.progress || 0);
+    setAssignedTo(task.assignedTo?._id || task.assignedTo || '');
+  }, [isOpen, task]);
 
-    // Join task chat room
-    socket.emit('taskChatJoined', {
-      taskId: task._id,
-      userId: currentUserId,
-      userName: currentUserName,
-      boardId,
-      taskTitle: task.title,
-    });
-
-    // Listeners
-    const handleActiveUsers = (data) => {
-      if (data.taskId === task._id) {
-        setTaskOnlineUsers(data.users || []);
-      }
-    };
-
-    const handleMessageSent = (data) => {
-      if (data.taskId === task._id) {
-        setMessages((prev) => [...prev, data.message]);
-      }
-    };
-
-    const handleMessageEdited = (data) => {
-      if (data.taskId === task._id) {
-        setMessages((prev) =>
-          prev.map((msg) => (msg._id === data.message._id ? data.message : msg))
-        );
-      }
-    };
-
-    const handleMessageDeleted = (data) => {
-      if (data.taskId === task._id) {
-        setMessages((prev) => prev.filter((msg) => msg._id !== data.messageId));
-      }
-    };
-
-    const handleTypingStart = (data) => {
-      if (data.taskId === task._id && data.userId !== currentUserId) {
-        setTypingUsers((prev) => ({
-          ...prev,
-          [data.userId]: data.userName,
-        }));
-      }
-    };
-
-    const handleTypingStop = (data) => {
-      if (data.taskId === task._id) {
-        setTypingUsers((prev) => {
-          const next = { ...prev };
-          delete next[data.userId];
-          return next;
-        });
-      }
-    };
-
-    socket.on('activeUsersUpdated', handleActiveUsers);
-    socket.on('chatMessageSent', handleMessageSent);
-    socket.on('chatMessageEdited', handleMessageEdited);
-    socket.on('chatMessageDeleted', handleMessageDeleted);
-    socket.on('typingStarted', handleTypingStart);
-    socket.on('typingStopped', handleTypingStop);
-
-    return () => {
-      socket.emit('taskChatLeft', {
-        taskId: task._id,
-        userId: currentUserId,
-        boardId,
-      });
-
-      socket.off('activeUsersUpdated', handleActiveUsers);
-      socket.off('chatMessageSent', handleMessageSent);
-      socket.off('chatMessageEdited', handleMessageEdited);
-      socket.off('chatMessageDeleted', handleMessageDeleted);
-      socket.off('typingStarted', handleTypingStart);
-      socket.off('typingStopped', handleTypingStop);
-    };
-  }, [isOpen, task._id, boardId, currentUserId, currentUserName, task.title]);
-
-  // Scroll to bottom on new messages
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, typingUsers]);
-
-  // Handle typing input
-  const handleMessageChange = (e) => {
-    setNewMessage(e.target.value);
-
-    // Emit typing started
-    socket.emit('typingStarted', {
-      boardId,
-      taskId: task._id,
-      userId: currentUserId,
-      userName: currentUserName,
-    });
-
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-
-    typingTimeoutRef.current = setTimeout(() => {
-      socket.emit('typingStopped', {
-        boardId,
-        taskId: task._id,
-        userId: currentUserId,
-        userName: currentUserName,
-      });
-    }, 1500);
-  };
-
-  // Submit new message
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!newMessage.trim()) return;
-
-    try {
-      await axiosInstance.post(`/tasks/${task._id}/messages`, {
-        message: newMessage.trim(),
-        boardId,
-      });
-      setNewMessage('');
-      socket.emit('typingStopped', {
-        boardId,
-        taskId: task._id,
-        userId: currentUserId,
-        userName: currentUserName,
-      });
-    } catch (err) {
-      console.error('Failed to send message:', err);
-      toast.error('Message send failed');
-    }
-  };
-
-  // Submit task updates
   const handleSubmitUpdates = async (e) => {
     e.preventDefault();
     if (!title.trim()) {
-      alert('Title is required');
+      toast.error('Title is required');
+      return;
+    }
+
+    if (!isOwner) {
+      toast.error('Only the workspace owner can edit this task.');
       return;
     }
 
@@ -209,18 +63,11 @@ const EditTaskModal = ({ isOpen, onClose, task, boardId }) => {
         dueDate: dueDate || undefined,
         status,
         progress: parseInt(progress, 10),
+        assignedTo: assignedTo || undefined,
       };
-
-      if (isOwner) {
-        data.assignedTo = assignedTo || undefined;
-      }
 
       const resultAction = await dispatch(updateTask({ taskId: task._id, data }));
       if (updateTask.fulfilled.match(resultAction)) {
-        socket.emit('task-updated', {
-          boardId,
-          task: resultAction.payload,
-        });
         toast.success('Task updated successfully');
         onClose();
       }
@@ -232,30 +79,28 @@ const EditTaskModal = ({ isOpen, onClose, task, boardId }) => {
     }
   };
 
-  // Delete message
-  const handleDeleteMessage = async (messageId) => {
-    if (!window.confirm('Delete this message?')) return;
-    try {
-      await axiosInstance.delete(`/tasks/${task._id}/messages/${messageId}`);
-    } catch (err) {
-      console.error('Delete message failed:', err);
-      toast.error('Failed to delete message');
-    }
-  };
+  const handleDeleteTask = async () => {
+    if (!task?._id) return;
+    if (!window.confirm(`Delete task "${task.title}" permanently?`)) return;
 
-  // Edit message save
-  const handleSaveEditMessage = async (messageId) => {
-    if (!editingMessageText.trim()) return;
+    if (!isOwner) {
+      toast.error('Only the workspace owner can delete tasks.');
+      return;
+    }
+
+    setIsDeleting(true);
     try {
-      await axiosInstance.put(`/tasks/${task._id}/messages/${messageId}`, {
-        message: editingMessageText.trim(),
-        boardId,
-      });
-      setEditingMessageId(null);
-      setEditingMessageText('');
+      const resultAction = await dispatch(deleteTask(task._id));
+      if (deleteTask.fulfilled.match(resultAction)) {
+        socket.emit('task-deleted', { boardId, taskId: task._id });
+        toast.success('Task deleted');
+        onClose();
+      }
     } catch (err) {
-      console.error('Edit message failed:', err);
-      toast.error('Failed to edit message');
+      console.error('Delete task failed:', err);
+      toast.error('Could not delete task');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -264,9 +109,7 @@ const EditTaskModal = ({ isOpen, onClose, task, boardId }) => {
     return aUser ? aUser.name : 'Unassigned';
   };
 
-  if (!isOpen) return null;
-
-  const typingList = Object.values(typingUsers);
+  if (!isOpen || !task) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
@@ -276,7 +119,7 @@ const EditTaskModal = ({ isOpen, onClose, task, boardId }) => {
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 bg-slate-900 flex-shrink-0">
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-sky-400 font-semibold">Card Details</p>
-            <h3 className="mt-1 text-lg font-bold text-white truncate max-w-md">Edit Task & Chat</h3>
+            <h3 className="mt-1 text-lg font-bold text-white truncate max-w-md">Edit Task</h3>
           </div>
           <button
             onClick={onClose}
@@ -302,6 +145,7 @@ const EditTaskModal = ({ isOpen, onClose, task, boardId }) => {
                   onChange={(e) => setTitle(e.target.value)}
                   className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-xs text-white placeholder-slate-500 outline-none focus:border-sky-500/60"
                   required
+                  disabled={!isOwner}
                 />
               </label>
 
@@ -311,6 +155,7 @@ const EditTaskModal = ({ isOpen, onClose, task, boardId }) => {
                   value={status}
                   onChange={(e) => setStatus(e.target.value)}
                   className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-xs text-white outline-none focus:border-sky-500/60"
+                  disabled={!isOwner}
                 >
                   <option value="Todo">Todo</option>
                   <option value="In Progress">In Progress</option>
@@ -327,6 +172,7 @@ const EditTaskModal = ({ isOpen, onClose, task, boardId }) => {
                 onChange={(e) => setDescription(e.target.value)}
                 rows="3"
                 className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-xs text-white placeholder-slate-500 outline-none focus:border-sky-500/60 resize-none"
+                disabled={!isOwner}
               />
             </label>
 
@@ -334,9 +180,10 @@ const EditTaskModal = ({ isOpen, onClose, task, boardId }) => {
               <label className="block text-xs">
                 <span className="text-slate-300 font-medium mb-1.5 block">Priority</span>
                 <select
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-xs text-white outline-none focus:border-sky-500/60"
+                    value={priority}
+                    onChange={(e) => setPriority(e.target.value)}
+                    className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-xs text-white outline-none focus:border-sky-500/60"
+                    disabled={!isOwner}
                 >
                   <option value="Low">Low</option>
                   <option value="Medium">Medium</option>
@@ -351,6 +198,7 @@ const EditTaskModal = ({ isOpen, onClose, task, boardId }) => {
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
                   className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-xs text-white outline-none focus:border-sky-500/60"
+                  disabled={!isOwner}
                 />
               </label>
 
@@ -402,170 +250,87 @@ const EditTaskModal = ({ isOpen, onClose, task, boardId }) => {
             </div>
 
             {/* Form actions */}
-            <div className="flex justify-end gap-3 pt-6 border-t border-white/10">
+            <div className="flex flex-col gap-3 pt-6 border-t border-white/10">
               <button
                 type="button"
-                onClick={onClose}
-                className="rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 px-4 py-2 text-xs font-semibold text-slate-300 transition"
+                onClick={handleDeleteTask}
+                disabled={!isOwner || isDeleting}
+                className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-200 hover:bg-rose-500/20 disabled:opacity-50"
               >
-                Cancel
+                <span className="inline-flex items-center gap-2">
+                  <HiOutlineTrash className="h-4 w-4" />
+                  {isDeleting ? 'Deleting...' : 'Delete Task'}
+                </span>
               </button>
-              <button
-                type="submit"
-                disabled={isUpdating}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-sky-500 px-5 py-2 text-xs font-semibold text-white transition hover:bg-sky-400 disabled:opacity-50"
-              >
-                <HiOutlineCheck className="h-4 w-4" />
-                {isUpdating ? 'Saving...' : 'Save Changes'}
-              </button>
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 px-4 py-3 text-sm font-semibold text-slate-300 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!isOwner || isUpdating}
+                  className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-sky-400 disabled:opacity-50"
+                >
+                  <HiOutlineCheck className="h-4 w-4" />
+                  {isUpdating ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
             </div>
           </form>
 
-          {/* Right Panel: Collaborative Group Chat */}
-          <div className="w-full lg:w-1/2 flex flex-col h-full bg-slate-950/40">
-            {/* Chat header */}
-            <div className="px-4 py-3 bg-slate-900/60 border-b border-white/10 flex items-center justify-between text-xs flex-shrink-0">
-              <div className="flex items-center gap-1.5 text-slate-300">
-                <HiOutlineChatAlt className="h-4.5 w-4.5 text-sky-400" />
-                <span className="font-bold">Task Group Chat</span>
-              </div>
+          <div className="w-full lg:w-1/2 p-6 overflow-y-auto">
+            <div className="h-full rounded-[32px] border border-white/10 bg-slate-950/50 p-6 flex flex-col justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.24em] text-sky-400 font-semibold">Task Summary</p>
+                <h4 className="mt-3 text-xl font-semibold text-white">{task.title}</h4>
+                <p className="mt-4 text-sm leading-relaxed text-slate-300">
+                  {task.description || 'No description available for this task.'}
+                </p>
 
-              {/* Online task users */}
-              <div className="flex items-center gap-1 bg-slate-950/80 rounded-lg px-2 py-1 border border-white/5" title="Users viewing this task">
-                <HiOutlineUserGroup className="h-3.5 w-3.5 text-slate-400" />
-                <span className="text-[10px] text-slate-400 font-medium">
-                  {taskOnlineUsers.length} online
-                </span>
-              </div>
-            </div>
-
-            {/* Messages box */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar min-h-0">
-              {messages.length > 0 ? (
-                messages.map((msg) => {
-                  const isSelf = msg.senderId?._id === currentUserId || msg.senderId === currentUserId;
-                  const isEditing = editingMessageId === msg._id;
-                  const senderName = msg.senderId?.name || 'Collaborator';
-
-                  return (
-                    <div
-                      key={msg._id}
-                      className={`flex gap-3 max-w-[85%] ${isSelf ? 'ml-auto flex-row-reverse' : ''}`}
-                    >
-                      {/* Avatar */}
-                      <span
-                        className="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-slate-800 to-slate-700 text-white text-[10px] font-bold border border-slate-950"
-                        title={senderName}
-                      >
-                        {senderName.charAt(0).toUpperCase()}
-                      </span>
-
-                      {/* Bubble */}
-                      <div className="space-y-1">
-                        <div className="flex items-baseline gap-2 justify-between">
-                          <span className="text-[9px] font-semibold text-slate-400">{senderName}</span>
-                          <span className="text-[8px] text-slate-500 font-medium">
-                            {new Date(msg.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-
-                        <div className={`group relative rounded-xl px-3 py-2 border ${
-                          isSelf
-                            ? 'bg-sky-500/10 border-sky-500/20 text-slate-100 rounded-tr-none'
-                            : 'bg-slate-900 border-white/5 text-slate-300 rounded-tl-none'
-                        }`}>
-                          {isEditing ? (
-                            <div className="space-y-1.5 py-1">
-                              <input
-                                value={editingMessageText}
-                                onChange={(e) => setEditingMessageText(e.target.value)}
-                                className="w-full rounded bg-slate-950 border border-white/10 px-2 py-1 text-[11px] text-white outline-none focus:border-sky-500"
-                              />
-                              <div className="flex gap-1.5 justify-end">
-                                <button
-                                  onClick={() => setEditingMessageId(null)}
-                                  className="text-[9px] px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-slate-400"
-                                >
-                                  Cancel
-                                </button>
-                                <button
-                                  onClick={() => handleSaveEditMessage(msg._id)}
-                                  className="text-[9px] px-2 py-0.5 rounded bg-sky-500 text-white font-bold"
-                                >
-                                  Save
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <>
-                              <p className="text-xs leading-normal whitespace-pre-wrap">{msg.message}</p>
-                              {/* Message actions (edit/delete) */}
-                              {isSelf && (
-                                <div className="hidden group-hover:flex absolute right-1 -top-6 bg-slate-950 border border-white/10 rounded px-1.5 py-0.5 gap-1.5 shadow-md">
-                                  <button
-                                    onClick={() => {
-                                      setEditingMessageId(msg._id);
-                                      setEditingMessageText(msg.message);
-                                    }}
-                                    className="text-slate-400 hover:text-sky-400 transition"
-                                    title="Edit Message"
-                                  >
-                                    <HiOutlinePencil className="h-3 w-3" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteMessage(msg._id)}
-                                    className="text-slate-400 hover:text-rose-400 transition"
-                                    title="Delete Message"
-                                  >
-                                    <HiOutlineTrash className="h-3 w-3" />
-                                  </button>
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center text-slate-500 py-12">
-                  <HiOutlineChatAlt className="h-8 w-8 mb-2 opacity-40 text-slate-400" />
-                  <p className="text-xs">No chat messages yet.</p>
-                  <p className="text-[10px] opacity-60">Send a message to start collaboration!</p>
+                <div className="mt-6 grid gap-3 text-sm sm:grid-cols-2">
+                  <div className="rounded-2xl bg-slate-900/80 p-4 border border-white/10">
+                    <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500 font-semibold">Status</p>
+                    <p className="mt-2 text-sm font-semibold text-white">{task.status}</p>
+                  </div>
+                  <div className="rounded-2xl bg-slate-900/80 p-4 border border-white/10">
+                    <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500 font-semibold">Priority</p>
+                    <p className="mt-2 text-sm font-semibold text-white">{task.priority}</p>
+                  </div>
+                  <div className="rounded-2xl bg-slate-900/80 p-4 border border-white/10">
+                    <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500 font-semibold">Due Date</p>
+                    <p className="mt-2 text-sm font-semibold text-white">
+                      {dueDate || 'No deadline'}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-slate-900/80 p-4 border border-white/10">
+                    <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500 font-semibold">Assigned To</p>
+                    <p className="mt-2 text-sm font-semibold text-white">{getAssignedName()}</p>
+                  </div>
                 </div>
-              )}
-              <div ref={chatEndRef} />
+              </div>
+
+              <div className="mt-8 rounded-3xl border border-white/10 bg-slate-900/80 p-6">
+                <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500 font-semibold">Owner Actions</p>
+                <div className="mt-4 space-y-4">
+                  <div className="rounded-2xl bg-slate-950/70 p-4 border border-white/10 text-sm text-slate-300">
+                    <p className="font-semibold text-slate-100">Assign User</p>
+                    <p className="mt-2 text-[11px] text-slate-400">Only the workspace owner can assign tasks.</p>
+                  </div>
+                  <div className="rounded-2xl bg-slate-950/70 p-4 border border-white/10 text-sm text-slate-300">
+                    <p className="font-semibold text-slate-100">Change Deadline</p>
+                    <p className="mt-2 text-[11px] text-slate-400">Owner-controlled deadline updates keep deliverables aligned.</p>
+                  </div>
+                  <div className="rounded-2xl bg-slate-950/70 p-4 border border-white/10 text-sm text-slate-300">
+                    <p className="font-semibold text-slate-100">Delete Task</p>
+                    <p className="mt-2 text-[11px] text-slate-400">Owner-only action to remove the task from the board.</p>
+                  </div>
+                </div>
+              </div>
             </div>
-
-            {/* Typing Indicator Bar */}
-            {typingList.length > 0 && (
-              <div className="px-4 py-1.5 text-[10px] text-sky-400 italic font-semibold flex-shrink-0 animate-pulse bg-slate-900/20 border-t border-white/5">
-                {typingList.join(', ')} {typingList.length === 1 ? 'is' : 'are'} typing...
-              </div>
-            )}
-
-            {/* Chat inputs */}
-            <form
-              onSubmit={handleSendMessage}
-              className="p-4 border-t border-white/10 bg-slate-900/40 flex-shrink-0"
-            >
-              <div className="flex gap-2">
-                <input
-                  value={newMessage}
-                  onChange={handleMessageChange}
-                  placeholder="Collaborate in real-time..."
-                  className="flex-1 rounded-xl border border-white/10 bg-slate-950 px-3.5 py-2 text-xs text-white placeholder-slate-500 outline-none focus:border-sky-500/60"
-                />
-                <button
-                  type="submit"
-                  disabled={!newMessage.trim()}
-                  className="rounded-xl bg-sky-500 hover:bg-sky-400 px-4 py-2 text-xs font-semibold text-white shadow-md disabled:opacity-40 transition"
-                >
-                  Send
-                </button>
-              </div>
-            </form>
           </div>
 
         </div>

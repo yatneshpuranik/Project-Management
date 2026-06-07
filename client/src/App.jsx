@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { setUser } from '../redux/userSlice.js'
 import axiosInstance from '../utils/axiosInstance'
+import { connectSocket, disconnectSocket } from '../utils/socket'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import ProfileScreen from '../page/ProfileScreen.jsx'
 import LoginScreen from '../page/LoginScreen.jsx'
 import AllUser from '../page/AllUser.jsx'
 import Home from '../page/Home.jsx'
 import BoardsScreen from '../page/BoardsScreen.jsx'
+import TaskDetails from '../page/TaskDetails.jsx'
 import Navbar from '../components/Navbar.jsx'
 import ProtectedRoute from '../components/ProtectedRoute.jsx'
 import Toast from '../components/Toast.jsx'
@@ -47,6 +49,14 @@ const App = () => {
   }, [dispatch])
 
   useEffect(() => {
+    if (user) {
+      connectSocket()
+    } else {
+      disconnectSocket()
+    }
+  }, [user])
+
+  useEffect(() => {
     const root = window.document.documentElement
     root.classList.add('dark')
     localStorage.setItem('theme', 'dark')
@@ -69,6 +79,7 @@ const App = () => {
             }
           >
             <Route path='/boards' element={<BoardsScreen />} />
+            <Route path='/boards/:boardId/tasks/:taskId' element={<BoardsScreen />} />
             <Route path='/boards/:boardId' element={<BoardsScreen />} />
             <Route path='/profile' element={<ProfileScreen />} />
             <Route path='/all-users' element={<AllUser />} />

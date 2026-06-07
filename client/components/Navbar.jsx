@@ -53,10 +53,29 @@ const Navbar = ({ toggleSidebar }) => {
       }
     };
 
+    const handleTaskAssigned = (data) => {
+      toast.success(
+        `You have been assigned a task: "${data.taskTitle}" by ${data.assignedBy}. Deadline: ${
+          data.deadline ? new Date(data.deadline).toLocaleDateString() : 'None'
+        }`
+      );
+      if (data.notification) {
+        setUserNotifications((prev) => [data.notification, ...prev]);
+      }
+    };
+
+    const handleTaskUnassigned = (data) => {
+      toast.info(`Task assignment removed: "${data.taskTitle}"`);
+    };
+
     socket.on('invitationSent', handleInviteSent);
+    socket.on('taskAssigned', handleTaskAssigned);
+    socket.on('taskUnassigned', handleTaskUnassigned);
 
     return () => {
       socket.off('invitationSent', handleInviteSent);
+      socket.off('taskAssigned', handleTaskAssigned);
+      socket.off('taskUnassigned', handleTaskUnassigned);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?._id]);
@@ -185,6 +204,11 @@ const Navbar = ({ toggleSidebar }) => {
             <div>
               <p className="text-[10px] font-medium uppercase tracking-[0.24em] text-slate-400">Workspace</p>
               <h1 className="text-sm font-semibold text-white leading-none mt-1">{activeBoardName}</h1>
+              {currentBoard && (
+                <p className="text-[9px] text-sky-400 font-semibold mt-1">
+                  Owner: {currentBoard.createdBy?.name || 'Unknown'}
+                </p>
+              )}
             </div>
           </Link>
         </div>

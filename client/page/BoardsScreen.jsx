@@ -10,7 +10,8 @@ import {
   removeBoardMember,
 } from '../redux/boardSlice.js'
 import Board from '../components/Board.jsx'
-import ActivityPanel from '../components/ActivityPanel.jsx'
+import WorkspaceSidePanel from '../components/WorkspaceSidePanel.jsx'
+import TaskDetailsDrawer from '../components/TaskDetailsDrawer.jsx'
 import axiosInstance from '../utils/axiosInstance'
 import socket from '../utils/socket'
 import { HiOutlineClock, HiOutlinePlus, HiOutlineUserAdd, HiOutlineFolder, HiOutlineTemplate, HiOutlineSparkles } from 'react-icons/hi'
@@ -540,14 +541,22 @@ const BoardsScreen = () => {
         </div>
       </div>
 
-      {/* Dockable Right Activity Panel */}
+      {/* Dockable Right Workspace Panel */}
       {isActivityOpen && (
         <aside className="w-full xl:w-76 flex-shrink-0 flex flex-col h-full bg-slate-950 border-l border-white/10 overflow-hidden rounded-2xl xl:rounded-none">
-          <div className="flex-1 overflow-y-auto p-4 xl:p-0">
-            <ActivityPanel tasks={tasks} onlineUsers={onlineUsers} />
+          <div className="flex-1 overflow-hidden">
+            <WorkspaceSidePanel boardId={boardId} currentBoard={currentBoard} onlineUsers={onlineUsers} />
           </div>
         </aside>
       )}
+
+      {/* Task Details Right-Side Slide-Over Drawer */}
+      <TaskDetailsDrawer
+        taskId={taskId}
+        boardId={boardId}
+        isOpen={Boolean(taskId)}
+        onClose={() => navigate(`/boards/${boardId}`)}
+      />
 
     </div>
   )

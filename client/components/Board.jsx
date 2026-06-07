@@ -32,8 +32,6 @@ const Board = ({ boardId }) => {
     const joinRoom = () => {
       socket.emit('join-board', {
         boardId,
-        userId: localStorage.getItem('userId'),
-        userName: localStorage.getItem('userName'),
       });
     };
 
@@ -96,7 +94,6 @@ const Board = ({ boardId }) => {
     return () => {
       socket.emit('leave-board', {
         boardId,
-        userId: localStorage.getItem('userId'),
       });
       socket.off('connect', handleConnect);
       socket.off('online-users', handleOnlineUsers);

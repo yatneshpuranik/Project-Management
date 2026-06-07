@@ -62,6 +62,30 @@ export const deleteTask = createAsyncThunk(
   }
 );
 
+export const joinTask = createAsyncThunk(
+  'tasks/join',
+  async (taskId, { rejectWithValue }) => {
+    try {
+      const response = await axiosInstance.post(`/tasks/${taskId}/join`);
+      return response.data.task;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Error joining task');
+    }
+  }
+);
+
+export const leaveTask = createAsyncThunk(
+  'tasks/leave',
+  async (taskId, { rejectWithValue }) => {
+    try {
+      const response = await axiosInstance.post(`/tasks/${taskId}/leave`);
+      return response.data.task;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Error leaving task');
+    }
+  }
+);
+
 const initialState = {
   tasks: [],
   loading: false,
@@ -180,6 +204,22 @@ const taskSlice = createSlice({
     });
     builder.addCase(deleteTask.rejected, (state, action) => {
       state.error = action.payload;
+    });
+
+    // Join Task
+    builder.addCase(joinTask.fulfilled, (state, action) => {
+      const index = state.tasks.findIndex(task => task._id === action.payload._id);
+      if (index !== -1) {
+        state.tasks[index] = action.payload;
+      }
+    });
+
+    // Leave Task
+    builder.addCase(leaveTask.fulfilled, (state, action) => {
+      const index = state.tasks.findIndex(task => task._id === action.payload._id);
+      if (index !== -1) {
+        state.tasks[index] = action.payload;
+      }
     });
   },
 });

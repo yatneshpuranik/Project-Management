@@ -1,61 +1,9 @@
-import { useState, useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { deleteTask } from '../redux/taskSlice';
-import EditTaskModal from './EditTaskModal';
-import socket from '../utils/socket';
-import { HiOutlineCalendar, HiOutlineChat, HiOutlineTrash, HiOutlineUserCircle } from 'react-icons/hi';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const TaskCard = ({ task, boardId, status }) => {
-  const dispatch = useDispatch();
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(() => {
-    const stored = localStorage.getItem(`unread_chat_${task._id}`);
-    return stored ? parseInt(stored, 10) : 0;
-  });
-
-  const currentBoard = useSelector((state) => state.boards.currentBoard);
-  const currentUserId = localStorage.getItem('userId');
-  const isOwner =
-    currentBoard &&
-    (currentBoard.createdBy?._id === currentUserId || currentBoard.createdBy === currentUserId);
-
-  useEffect(() => {
-    const handleBoardMessage = (data) => {
-      if (data.taskId === task._id && !isEditOpen) {
-        setUnreadCount((prev) => {
-          const next = prev + 1;
-          localStorage.setItem(`unread_chat_${task._id}`, next.toString());
-          return next;
-        });
-      }
-    };
-
-    socket.on('boardChatMessageSent', handleBoardMessage);
-    return () => {
-      socket.off('boardChatMessageSent', handleBoardMessage);
-    };
-  }, [task._id, isEditOpen]);
-
-  const handleDragStart = (e) => {
-    e.dataTransfer.setData(
-      'taskData',
-      JSON.stringify({ taskId: task._id, fromStatus: status })
-    );
-  };
-
-  const handleDelete = async (e) => {
-    e.stopPropagation();
-    if (window.confirm(`Are you sure you want to delete task "${task.title}"?`)) {
-      try {
-        const resultAction = await dispatch(deleteTask(task._id));
-        if (deleteTask.fulfilled.match(resultAction)) {
-          socket.emit('task-deleted', { boardId, taskId: task._id });
-        }
-      } catch (err) {
-        console.error('Delete task failed:', err);
-      }
-    }
-  };
+  const navigate = useNavigate();
+  const [dragging, setDragging] = useState(false);
 
   const getPriorityColor = (priority) => {
     switch (priority) {
@@ -69,33 +17,30 @@ const TaskCard = ({ task, boardId, status }) => {
     }
   };
 
-  // Due Date styling
   const getDueStyle = (dueDate) => {
-    if (!dueDate) return { text: '', className: '' };
+    if (!dueDate) return { text: 'No deadline', className: 'text-slate-500 bg-slate-900/40' };
     const due = new Date(dueDate);
     const today = new Date();
     due.setHours(0, 0, 0, 0);
     today.setHours(0, 0, 0, 0);
 
     const diff = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    const isDone = status === 'Done';
-
     if (diff < 0) {
       return {
         text: `${Math.abs(diff)}d overdue`,
-        className: isDone ? 'text-slate-500 bg-slate-900/40' : 'text-rose-400 bg-rose-500/10 font-bold border border-rose-500/10',
+        className: 'text-rose-400 bg-rose-500/10 font-bold border border-rose-500/10',
       };
     }
     if (diff === 0) {
       return {
         text: 'Due Today',
-        className: isDone ? 'text-slate-500 bg-slate-900/40' : 'text-amber-400 bg-amber-500/10 font-bold border border-amber-500/10',
+        className: 'text-amber-400 bg-amber-500/10 font-bold border border-amber-500/10',
       };
     }
     if (diff === 1) {
       return {
         text: 'Tomorrow',
-        className: isDone ? 'text-slate-500 bg-slate-900/40' : 'text-sky-400 bg-sky-500/10 border border-sky-500/10',
+        className: 'text-sky-400 bg-sky-500/10 border border-sky-500/10',
       };
     }
     return {
@@ -110,111 +55,63 @@ const TaskCard = ({ task, boardId, status }) => {
     <>
       <div
         draggable
-        onDragStart={handleDragStart}
+        onDragStart={(e) => {
+          e.dataTransfer.setData('taskData', JSON.stringify({ taskId: task._id, fromStatus: status }));
+          setDragging(true);
+        }}
+        onDragEnd={() => {
+          window.setTimeout(() => setDragging(false), 0);
+        }}
         onClick={() => {
-          setUnreadCount(0);
-          localStorage.removeItem(`unread_chat_${task._id}`);
-          setIsEditOpen(true);
+          if (dragging) return;
+          navigate(`/boards/${boardId}/tasks/${task._id}`)
         }}
         className="group relative flex flex-col justify-between rounded-xl border border-white/5 bg-slate-900/40 p-4 hover:border-slate-700/60 hover:bg-slate-900/60 cursor-grab active:cursor-grabbing transition shadow-sm hover:shadow-md"
       >
-        <div className="space-y-3">
-          {/* Badge Row */}
-          <div className="flex items-center justify-between">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
             <span className={`rounded-md px-2 py-0.5 text-[9px] font-bold uppercase ${getPriorityColor(task.priority)}`}>
               {task.priority}
             </span>
-            {isOwner && (
-              <button
-                onClick={handleDelete}
-                className="hidden group-hover:block rounded p-1 text-slate-500 hover:bg-white/5 hover:text-rose-400 transition"
-                title="Delete Task"
-              >
-                <HiOutlineTrash className="h-3.5 w-3.5" />
-              </button>
-            )}
+            <span className="rounded-full bg-slate-950/60 px-2 py-1 text-[9px] font-semibold text-slate-300">
+              {status}
+            </span>
           </div>
 
-          {/* Title & Desc */}
           <div>
-            <h4 className="text-xs font-semibold text-slate-100 group-hover:text-sky-400 transition line-clamp-1">
-              {task.title}
-            </h4>
-            {task.description && (
-              <p className="mt-1 text-[10px] text-slate-400 line-clamp-2 leading-relaxed">
-                {task.description}
-              </p>
-            )}
+            <h4 className="text-sm font-semibold text-slate-100 line-clamp-2">{task.title}</h4>
           </div>
 
-          {/* Progress Bar */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between text-[8px] text-slate-500 font-semibold">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-[9px] text-slate-400 font-semibold">
               <span>Progress</span>
-              <span>{task.progress || 0}%</span>
+              <span>{task.progress ?? 0}%</span>
             </div>
-            <div className="w-full bg-slate-950/60 h-1 rounded-full overflow-hidden border border-white/5">
+            <div className="w-full bg-slate-950/60 h-2 rounded-full overflow-hidden border border-white/5">
               <div
                 className="bg-gradient-to-r from-sky-500 to-blue-500 h-full rounded-full transition-all duration-300"
-                style={{ width: `${task.progress || 0}%` }}
-              ></div>
+                style={{ width: `${task.progress ?? 0}%` }}
+              />
             </div>
           </div>
         </div>
 
-        {/* Footer Details */}
-        <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-[9px]">
+        <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between gap-3 text-[10px] text-slate-300">
+          <span className={`rounded-full px-2 py-1 ${dueInfo.className}`}>{dueInfo.text}</span>
           <div className="flex items-center gap-2">
-            {dueInfo.text && (
-              <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[8px] ${dueInfo.className}`}>
-                <HiOutlineCalendar className="h-3 w-3" />
-                {dueInfo.text}
-              </span>
-            )}
-            <span className="inline-flex items-center gap-1 text-slate-500" title="Comments count">
-              <HiOutlineChat className="h-3.5 w-3.5" />
-              {task.comments?.length || 0}
-            </span>
-
-            {/* Chat Unread Badge */}
-            {unreadCount > 0 && (
-              <span className="inline-flex h-4 px-1 min-w-4 items-center justify-center rounded-full bg-sky-400 text-[8px] font-bold text-slate-950 animate-pulse">
-                {unreadCount}
-              </span>
-            )}
-          </div>
-
-          {/* Assignee initials/avatar */}
-          <div className="flex items-center gap-1.5 max-w-[50%]">
             {task.assignedTo ? (
-              <div
-                className="inline-flex h-4.5 w-4.5 items-center justify-center rounded-md bg-gradient-to-br from-slate-800 to-slate-700 text-white text-[8px] font-bold border border-slate-950"
-                title={`Assigned to ${task.assignedTo.name}`}
-              >
-                {task.assignedTo.name?.charAt(0).toUpperCase()}
+              <div className="inline-flex items-center gap-2 rounded-full bg-slate-950/70 px-2 py-1 text-[10px] text-slate-200">
+                <div className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-sky-500 text-[10px] font-bold text-slate-950">
+                  {task.assignedTo.name?.charAt(0).toUpperCase()}
+                </div>
+                <span>{task.assignedTo.name}</span>
               </div>
             ) : (
-              <HiOutlineUserCircle className="h-4.5 w-4.5 text-slate-600" title="Unassigned" />
+              <span className="text-slate-500">Unassigned</span>
             )}
           </div>
         </div>
-
-        {/* Display Created By */}
-        {task.createdBy?.name && (
-          <div className="mt-1.5 text-[8px] text-slate-500 border-t border-dashed border-white/5 pt-1.5">
-            Created By: <span className="font-medium text-slate-400">{task.createdBy.name}</span>
-          </div>
-        )}
       </div>
-
-      {isEditOpen && (
-        <EditTaskModal
-          isOpen={isEditOpen}
-          onClose={() => setIsEditOpen(false)}
-          task={task}
-          boardId={boardId}
-        />
-      )}
     </>
   );
 };

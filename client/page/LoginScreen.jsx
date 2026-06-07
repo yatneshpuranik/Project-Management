@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useDispatch } from 'react-redux'
 import { setUser } from '../redux/userSlice.js'
-import axios from 'axios'
+import axiosInstance from '../utils/axiosInstance.js'
 import { useNavigate } from 'react-router-dom'
 import { HiOutlineUser, HiOutlineMail, HiOutlineLockClosed, HiOutlineArrowRight, HiOutlineViewBoards } from 'react-icons/hi'
 
@@ -34,15 +34,12 @@ const LoginScreen = () => {
       return
     }
 
-    const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:5000'
-    const endpoint = isRegister ? '/api/user/register' : '/api/user/login'
     const payload = isRegister ? { name, email, password } : { email, password }
 
     try {
-      const result = await axios.post(
-        `${serverUrl}${endpoint}`,
-        payload,
-        { withCredentials: true }
+      const result = await axiosInstance.post(
+        `/user/${isRegister ? 'register' : 'login'}`,
+        payload
       )
 
       if (isRegister) {
@@ -66,7 +63,23 @@ const LoginScreen = () => {
       }
     } catch (err) {
       console.error('Auth request failed:', err)
-      setError(err.response?.data?.message || 'Authentication failed. Please check your credentials.')
+      const networkMessage =
+        err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')
+          ? 'Network Error: Unable to reach the authentication server. Check backend status and your connection.'
+          : err.code === 'ECONNREFUSED' || err.message?.includes('ECONNREFUSED')
+          ? 'Backend Offline: Unable to connect to the server. Please start the backend and try again.'
+          : null
+      const statusMessage = err.response
+        ? err.response.status === 401
+          ? err.response.data?.message || 'Invalid Credentials: Email/username or password is incorrect.'
+          : err.response.status === 404
+          ? 'Server Error: Authentication endpoint not found.'
+          : err.response.status >= 500
+          ? 'Server Error: An error occurred on the backend. Please try again later.'
+          : err.response.data?.message
+        : null
+
+      setError(networkMessage || statusMessage || 'Authentication failed. Please check your credentials.')
     } finally {
       setLoading(false)
     }
