@@ -11,7 +11,7 @@ import attachmentRoute from "./route/attachmentRoute.js";
 import activityRoute from "./route/activityRoute.js";
 import analyticsRoute from "./route/analyticsRoute.js";
 import notificationRoute from "./route/notificationRoute.js";
-import adminRoute from "./route/adminRoute.js";
+import adminRoute from "./route/admin/adminRoutes.js";
 import setupSocket from "./socket/socket.js";
 import cookieParser from "cookie-parser";
 import cors from "cors";

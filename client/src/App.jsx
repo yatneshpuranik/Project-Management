@@ -16,7 +16,18 @@ import Toast from '../components/Toast.jsx'
 import DashboardLayout from '../components/DashboardLayout.jsx'
 import AnalyticsScreen from '../page/AnalyticsScreen.jsx'
 import SettingsScreen from '../page/SettingsScreen.jsx'
-import AdminDashboard from '../page/AdminDashboard.jsx'
+
+// Modular Admin Imports
+import AdminLayout from './components/admin/layout/AdminLayout.jsx'
+import AdminDashboard from './pages/admin/AdminDashboard.jsx'
+import AdminUsers from './pages/admin/AdminUsers.jsx'
+import AdminWorkspaces from './pages/admin/AdminWorkspaces.jsx'
+import AdminTasks from './pages/admin/AdminTasks.jsx'
+import AdminInvites from './pages/admin/AdminInvites.jsx'
+import AdminAnalytics from './pages/admin/AdminAnalytics.jsx'
+import AdminSecurity from './pages/admin/AdminSecurity.jsx'
+import AdminSettings from './pages/admin/AdminSettings.jsx'
+
 
 const App = () => {
   const dispatch = useDispatch()
@@ -39,7 +50,7 @@ const App = () => {
 
       try {
         const result = await axiosInstance.get('/user/me')
-        localStorage.setItem('userRole', result.data.user.role || 'MEMBER')
+        localStorage.setItem('userRole', result.data.user.role || 'USER')
         dispatch(setUser(result.data.user))
       } catch {
         localStorage.removeItem('token')
@@ -104,7 +115,27 @@ const App = () => {
             <Route path='/all-users' element={<AllUser />} />
             <Route path='/analytics' element={<AnalyticsScreen />} />
             <Route path='/settings' element={<SettingsScreen />} />
+          </Route>
+
+          {/* Admin Protected Area */}
+          <Route
+            element={
+              <ProtectedRoute>
+                <AdminLayout />
+              </ProtectedRoute>
+            }
+          >
             <Route path='/admin' element={<AdminDashboard />} />
+            <Route path='/admin/users' element={<AdminUsers />} />
+            <Route path='/admin/workspaces' element={<AdminWorkspaces />} />
+            <Route path='/admin/tasks' element={<AdminTasks />} />
+            <Route path='/admin/invites' element={<AdminInvites />} />
+            <Route path='/admin/analytics' element={<AdminAnalytics />} />
+            <Route path='/admin/security' element={<AdminSecurity view="security" />} />
+            <Route path='/admin/audit-logs' element={<AdminSecurity view="audit" />} />
+            <Route path='/admin/role-management' element={<AdminSecurity view="roles" />} />
+            <Route path='/admin/system-health' element={<AdminSecurity view="health" />} />
+            <Route path='/admin/settings' element={<AdminSettings />} />
           </Route>
 
           <Route path='*' element={<Navigate to='/' replace />} />

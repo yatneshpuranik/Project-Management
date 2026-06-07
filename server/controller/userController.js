@@ -314,10 +314,10 @@ export const LogoutUser = async (req, res) => {
 
 export const blockUser = async (req, res) => {
     try {
-        if (req.user?.role !== 'OWNER') {
+        if (req.user?.role !== 'ADMIN') {
             return res.status(403).json({
                 success: false,
-                message: "Forbidden: Owner permissions required"
+                message: "Forbidden: Admin permissions required"
             });
         }
 
@@ -334,10 +334,10 @@ export const blockUser = async (req, res) => {
             });
         }
 
-        if (user.role === 'OWNER') {
+        if (user.role === 'ADMIN') {
             return res.status(400).json({
                 success: false,
-                message: "Cannot block an owner account"
+                message: "Cannot block an admin account"
             });
         }
 
@@ -368,10 +368,10 @@ export const blockUser = async (req, res) => {
 
 export const unblockUser = async (req, res) => {
     try {
-        if (req.user?.role !== 'OWNER') {
+        if (req.user?.role !== 'ADMIN') {
             return res.status(403).json({
                 success: false,
-                message: "Forbidden: Owner permissions required"
+                message: "Forbidden: Admin permissions required"
             });
         }
 
@@ -446,10 +446,22 @@ export const searchUsers = async (req, res) => {
         .select('name email role avatar')
         .limit(10);
 
+        // Fetch pending invites for these users to set inviteStatus dynamically
+        let pendingUserIds = new Set();
+        if (boardId && users.length > 0) {
+            const pendingInvites = await Notification.find({
+                recipient: { $in: users.map(u => u._id) },
+                boardId,
+                type: 'board_invite',
+                status: 'pending'
+            });
+            pendingUserIds = new Set(pendingInvites.map(n => n.recipient.toString()));
+        }
+
         const safeUsers = users.map(user => {
             const u = user.toObject();
             const encryptedUser = encryptUserIds(u);
-            encryptedUser.inviteStatus = 'none';
+            encryptedUser.inviteStatus = pendingUserIds.has(user._id.toString()) ? 'pending' : 'none';
             encryptedUser.avatar = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name)}`;
             return encryptedUser;
         });
@@ -470,8 +482,8 @@ export const searchUsers = async (req, res) => {
 export const promoteUser = async (req, res) => {
     try {
         const currentRole = req.user?.role;
-        if (currentRole !== 'OWNER' && currentRole !== 'ADMIN') {
-            return res.status(403).json({ success: false, message: 'Forbidden: Owner or Admin permissions required' });
+        if (currentRole !== 'ADMIN') {
+            return res.status(403).json({ success: false, message: 'Forbidden: Admin permissions required' });
         }
 
         const { userId } = req.params;
@@ -483,12 +495,12 @@ export const promoteUser = async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
 
-        user.role = 'OWNER';
+        user.role = 'ADMIN';
         await user.save();
 
         return res.status(200).json({
             success: true,
-            message: 'User promoted to Owner successfully',
+            message: 'User promoted to Admin successfully',
             user: encryptUserIds(user)
         });
     } catch (err) {
@@ -499,8 +511,8 @@ export const promoteUser = async (req, res) => {
 export const demoteUser = async (req, res) => {
     try {
         const currentRole = req.user?.role;
-        if (currentRole !== 'OWNER' && currentRole !== 'ADMIN') {
-            return res.status(403).json({ success: false, message: 'Forbidden: Owner or Admin permissions required' });
+        if (currentRole !== 'ADMIN') {
+            return res.status(403).json({ success: false, message: 'Forbidden: Admin permissions required' });
         }
 
         const { userId } = req.params;
@@ -516,7 +528,7 @@ export const demoteUser = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Cannot demote the primary admin account' });
         }
 
-        user.role = 'MEMBER';
+        user.role = 'USER';
         await user.save();
 
         return res.status(200).json({

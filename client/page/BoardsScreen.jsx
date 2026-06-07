@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
@@ -8,87 +8,111 @@ import {
   setCurrentBoard,
   addBoardMember,
   removeBoardMember,
+  deleteBoard
 } from '../redux/boardSlice.js'
+import { fetchTasksByBoard } from '../redux/taskSlice.js'
 import Board from '../components/Board.jsx'
-import WorkspaceSidePanel from '../components/WorkspaceSidePanel.jsx'
 import TaskDetailsDrawer from '../components/TaskDetailsDrawer.jsx'
 import ChatDrawer from '../components/ChatDrawer.jsx'
 import axiosInstance from '../utils/axiosInstance'
 import socket from '../utils/socket'
-import { HiOutlineClock, HiOutlinePlus, HiOutlineUserAdd, HiOutlineFolder, HiOutlineTemplate, HiOutlineSparkles } from 'react-icons/hi'
+import { toast } from '../utils/toast'
+import {
+  HiOutlineClock,
+  HiOutlinePlus,
+  HiOutlineUserAdd,
+  HiOutlineFolder,
+  HiOutlineTemplate,
+  HiOutlineSparkles,
+  HiOutlineChatAlt,
+  HiOutlineChevronRight,
+  HiOutlineLogout,
+  HiOutlineUserCircle
+} from 'react-icons/hi'
+
+// Custom inline SVG icons for Voice / Media controls
+const MuteIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4 h-4">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 9.75L19.5 12m0 0l2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6L4.5 9H1.5v6h3l2.25 2.25V8.25z" />
+  </svg>
+)
+
+const MicIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4 h-4">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+  </svg>
+)
+
+const CameraIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4 h-4">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" />
+  </svg>
+)
+
+const ScreenIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4 h-4">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" />
+  </svg>
+)
+
+const DisconnectIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4.5 h-4.5">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M14.25 9.75L16.5 12m0 0l2.25 2.25M16.5 12l2.25-2.25M16.5 12l-2.25 2.25M6.5 18c-2.209 0-4-1.791-4-4s1.791-4 4-4a4 4 0 014 4c0 2.209-1.791 4-4 4zm0 0H21m-4.5-8.25L14.25 12m0 0l-2.25-2.25m2.25 2.25L12 14.25" />
+  </svg>
+)
 
 const BoardsScreen = () => {
   const dispatch = useDispatch()
   const navigate = useNavigate()
   const { boardId, taskId } = useParams()
   const { boards, currentBoard } = useSelector((state) => state.boards)
-  const { tasks, onlineUsers } = useSelector((state) => state.tasks)
-  const currentUserId = localStorage.getItem('userId');
+  const { tasks } = useSelector((state) => state.tasks)
+  
+  const currentUserId = localStorage.getItem('userId')
+  const currentUserName = localStorage.getItem('userName') || 'You'
 
-  const getDeadlineInfo = (dueDate, status) => {
-    if (!dueDate) return null;
-    const due = new Date(dueDate);
-    const today = new Date();
-    due.setHours(0, 0, 0, 0);
-    today.setHours(0, 0, 0, 0);
+  // Tabs navigation state
+  const [activeTab, setActiveTab] = useState('dashboard')
 
-    const diffTime = due.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    const isDone = status === 'Done';
+  // Activities logs state
+  const [activities, setActivities] = useState([])
 
-    let text;
-    let isOverdue = false;
-    let className = 'text-slate-500 bg-slate-950/40';
+  // Invite member states
+  const [inviteSearch, setInviteSearch] = useState('')
+  const [isInviteOpen, setIsInviteOpen] = useState(false)
+  const [searchResults, setSearchResults] = useState([])
+  const [isSearching, setIsSearching] = useState(false)
 
-    if (diffDays < 0) {
-      isOverdue = !isDone;
-      text = `${Math.abs(diffDays)}d overdue`;
-      if (isOverdue) {
-        className = 'text-rose-400 bg-rose-500/10 border border-rose-500/20 font-bold';
-      }
-    } else if (diffDays === 0) {
-      text = 'Due Today';
-      if (!isDone) {
-        className = 'text-amber-400 bg-amber-500/10 border border-amber-500/20 font-bold';
-      }
-    } else if (diffDays === 1) {
-      text = 'Tomorrow';
-      if (!isDone) {
-        className = 'text-sky-400 bg-sky-500/10 border border-sky-500/20';
-      }
-    } else {
-      text = `${diffDays}d left`;
-    }
+  // Ownership transfer state
+  const [newOwnerId, setNewOwnerId] = useState('')
 
-    return { text, isOverdue, className };
-  };
-
+  // Create Workspace Dialog States
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [isCreating, setIsCreating] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
-  // Invite member state
-  const [inviteSearch, setInviteSearch] = useState('')
-  const [isInviteOpen, setIsInviteOpen] = useState(false)
-  const [invitingBoardId, setInvitingBoardId] = useState(null)
-  const [searchResults, setSearchResults] = useState([])
-  const [isSearching, setIsSearching] = useState(false)
-
-  // Toggle Activity feed
-  const [isActivityOpen, setIsActivityOpen] = useState(true)
-
-  // Owner dashboard view state
-  const [showOwnerDashboard, setShowOwnerDashboard] = useState(false)
-
-  // Discovery & Search Workspaces State
+  // Search/Discovery Workspaces State
   const [discoveryQuery, setDiscoveryQuery] = useState('')
   const [discoveryResults, setDiscoveryResults] = useState([])
   const [isSearchingWorkspaces, setIsSearchingWorkspaces] = useState(false)
   const [discoveryFilter, setDiscoveryFilter] = useState('')
 
-  // Active chat channel
-  const [activeChatChannel, setActiveChatChannel] = useState(null)
+  // Inline Chat/Voice states
+  const [activeChatChannel, setActiveChatChannel] = useState('general')
+  const [unreadCounts, setUnreadCounts] = useState({})
+  
+  // Realtime Voice Call States
+  const [activeVoiceChannel, setActiveVoiceChannel] = useState(null)
+  const [voiceChannelUsers, setVoiceChannelUsers] = useState({})
+  const [isMuted, setIsMuted] = useState(false)
+  const [isCameraOn, setIsCameraOn] = useState(false)
+  const [isScreenSharing, setIsScreenSharing] = useState(false)
+
+  // Channels lists definitions
+  const textChannels = currentBoard?.channels || ['general', 'development', 'testing', 'announcements']
+  const voiceChannels = ['general-voice', 'development-voice', 'meeting-voice']
 
   useEffect(() => {
     dispatch(fetchBoards())
@@ -97,46 +121,48 @@ const BoardsScreen = () => {
   useEffect(() => {
     if (boardId) {
       dispatch(fetchBoardById(boardId))
+      dispatch(fetchTasksByBoard(boardId))
+      // Reset voice state on switching board
+      setActiveVoiceChannel(null)
+      setVoiceChannelUsers({})
+      setUnreadCounts({})
     }
-    setActiveChatChannel(null)
   }, [boardId, dispatch])
 
-  useEffect(() => {
-    if (!boardId) {
-      searchGlobalWorkspaces('', '')
+  // Load activities for the board
+  const loadActivities = async () => {
+    if (!boardId) return
+    try {
+      const res = await axiosInstance.get(`/activity/board/${boardId}`)
+      setActivities(res.data.activities || [])
+    } catch (e) {
+      console.error(e)
     }
-  }, [boardId])
+  }
 
+  useEffect(() => {
+    if (boardId && activeTab === 'dashboard') {
+      loadActivities()
+    }
+  }, [boardId, activeTab])
+
+  // Global search for workspaces
   useEffect(() => {
     if (!boardId) {
       searchGlobalWorkspaces(discoveryQuery, discoveryFilter)
     }
   }, [boardId, discoveryFilter])
 
+  // Search users for invite
   useEffect(() => {
-    if (!boardId && boards.length > 0) {
-      // Don't auto-redirect to first board so the user can see the main boards directory/dashboard
-    }
-  }, [boardId, boards])
-
-  useEffect(() => {
-    if (!boardId && currentBoard) {
-      dispatch(setCurrentBoard(null))
-    }
-  }, [boardId, currentBoard, dispatch])
-
-  // Debounced search for invite members
-  useEffect(() => {
-    const activeId = boardId || invitingBoardId
-    if (!inviteSearch.trim() || !activeId) {
+    if (!inviteSearch.trim() || !boardId) {
       setSearchResults([])
       return
     }
-
     setIsSearching(true)
     const delayDebounce = setTimeout(async () => {
       try {
-        const response = await axiosInstance.get(`/user/search?q=${encodeURIComponent(inviteSearch)}&boardId=${activeId}`)
+        const response = await axiosInstance.get(`/user/search?q=${encodeURIComponent(inviteSearch)}&boardId=${boardId}`)
         setSearchResults(response.data.users || [])
       } catch (err) {
         console.error('User search error:', err)
@@ -144,40 +170,272 @@ const BoardsScreen = () => {
         setIsSearching(false)
       }
     }, 500)
-
     return () => clearTimeout(delayDebounce)
-  }, [inviteSearch, boardId, invitingBoardId])
+  }, [inviteSearch, boardId])
 
-  // Live member updates (added & removed)
+  // Real-time Sockets Integration
   useEffect(() => {
-    if (!boardId) return;
+    if (!boardId) return
 
-    const handleMemberAdded = (data) => {
-      if (data.boardId === boardId) {
-        dispatch(fetchBoardById(boardId));
+    // Socket joins board chatroom
+    socket.emit('workspaceChatJoined', { boardId })
+
+    const handleActivityCreated = (data) => {
+      if (data.activity && data.activity.boardId === boardId) {
+        setActivities((prev) => [data.activity, ...prev])
       }
-    };
+    }
 
-    const handleEviction = (data) => {
-      if (data.boardId === boardId) {
-        if (data.memberId === currentUserId) {
-          alert('You have been removed from this board by the owner.');
-          navigate('/boards', { replace: true });
-        } else {
-          dispatch(fetchBoardById(boardId));
+    const handleMessageSent = (data) => {
+      if (data.message && data.message.boardId === boardId) {
+        const msg = data.message
+        if (msg.channel.toLowerCase() !== activeChatChannel.toLowerCase() || activeTab !== 'chat') {
+          setUnreadCounts((prev) => ({
+            ...prev,
+            [msg.channel.toLowerCase()]: (prev[msg.channel.toLowerCase()] || 0) + 1
+          }))
         }
       }
-    };
+    }
 
-    socket.on('memberAdded', handleMemberAdded);
-    socket.on('memberRemoved', handleEviction);
+    const handleMemberEviction = (data) => {
+      if (data.boardId === boardId) {
+        if (data.memberId === currentUserId) {
+          toast.info('You have been removed from this board by the owner.')
+          navigate('/boards', { replace: true })
+        } else {
+          dispatch(fetchBoardById(boardId))
+        }
+      }
+    }
+
+    const handleMemberAddition = (data) => {
+      if (data.boardId === boardId) {
+        dispatch(fetchBoardById(boardId))
+      }
+    }
+
+    // Voice socket listeners
+    const onUserJoinedVoice = (data) => {
+      setVoiceChannelUsers((prev) => {
+        const ch = data.channelName
+        const users = prev[ch] || {}
+        return {
+          ...prev,
+          [ch]: {
+            ...users,
+            [data.userId]: {
+              userName: data.userName,
+              isMuted: false,
+              isCameraOn: false,
+              isScreenSharing: false,
+              ...users[data.userId]
+            }
+          }
+        }
+      })
+    }
+
+    const onUserLeftVoice = (data) => {
+      setVoiceChannelUsers((prev) => {
+        const ch = data.channelName
+        const users = { ...(prev[ch] || {}) }
+        delete users[data.userId]
+        return {
+          ...prev,
+          [ch]: users
+        }
+      })
+    }
+
+    const onVoiceStateUpdated = (data) => {
+      setVoiceChannelUsers((prev) => {
+        const ch = data.channelName
+        const users = prev[ch] || {}
+        return {
+          ...prev,
+          [ch]: {
+            ...users,
+            [data.userId]: {
+              userName: data.userName,
+              isMuted: data.isMuted,
+              isCameraOn: data.isCameraOn,
+              isScreenSharing: data.isScreenSharing
+            }
+          }
+        }
+      })
+    }
+
+    socket.on('activity-created', handleActivityCreated)
+    socket.on('workspaceMessageSent', handleMessageSent)
+    socket.on('memberRemoved', handleMemberEviction)
+    socket.on('memberAdded', handleMemberAddition)
+    socket.on('userJoinedVoice', onUserJoinedVoice)
+    socket.on('userLeftVoice', onUserLeftVoice)
+    socket.on('voiceStateUpdated', onVoiceStateUpdated)
 
     return () => {
-      socket.off('memberAdded', handleMemberAdded);
-      socket.off('memberRemoved', handleEviction);
-    };
-  }, [boardId, currentUserId, navigate, dispatch]);
+      socket.emit('workspaceChatLeft', { boardId })
+      socket.off('activity-created', handleActivityCreated)
+      socket.off('workspaceMessageSent', handleMessageSent)
+      socket.off('memberRemoved', handleMemberEviction)
+      socket.off('memberAdded', handleMemberAddition)
+      socket.off('userJoinedVoice', onUserJoinedVoice)
+      socket.off('userLeftVoice', onUserLeftVoice)
+      socket.off('voiceStateUpdated', onVoiceStateUpdated)
+    }
+  }, [boardId, activeChatChannel, activeTab, currentUserId])
 
+  // Evict member
+  const handleEvictMember = async (memberId) => {
+    if (!window.confirm('Are you sure you want to evict this member?')) return
+    try {
+      await dispatch(removeBoardMember({ boardId, memberId })).unwrap()
+      toast.success('Member evicted successfully.')
+      dispatch(fetchBoardById(boardId))
+    } catch (err) {
+      toast.error(err || 'Failed to evict member.')
+    }
+  }
+
+  // Leave Workspace
+  const handleLeaveWorkspace = async () => {
+    const isOwner = currentBoard && (currentBoard.createdBy?._id === currentUserId || currentBoard.createdBy === currentUserId)
+    if (isOwner) {
+      toast.error('Owner cannot leave workspace. Please transfer ownership or delete board.')
+      return
+    }
+    if (!window.confirm('Are you sure you want to leave this workspace?')) return
+    try {
+      await axiosInstance.post(`/boards/${boardId}/leave`)
+      toast.success('Successfully left the workspace.')
+      navigate('/boards')
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to leave workspace.')
+    }
+  }
+
+  // Transfer Ownership
+  const handleTransfer = async (e) => {
+    e.preventDefault()
+    if (!newOwnerId.trim()) return
+    try {
+      await axiosInstance.put(`/boards/${boardId}`, { createdBy: newOwnerId.trim() })
+      toast.success('Ownership transferred successfully.')
+      setNewOwnerId('')
+      dispatch(fetchBoardById(boardId))
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to transfer ownership.')
+    }
+  }
+
+  // Delete board workspace
+  const handleDeleteBoardWorkspace = async () => {
+    if (!window.confirm('Delete workspace permanently? This will erase all cards.')) return
+    try {
+      await dispatch(deleteBoard(boardId)).unwrap()
+      toast.success('Workspace deleted permanently.')
+      navigate('/boards')
+    } catch (err) {
+      toast.error(err || 'Failed to delete workspace.')
+    }
+  }
+
+  // Join Voice Channel
+  const handleJoinVoice = (ch) => {
+    if (!socket.connected) {
+      toast.error('Voice requires socket connection.')
+      return
+    }
+    if (activeVoiceChannel === ch) return
+
+    if (activeVoiceChannel) {
+      socket.emit('leaveVoiceChannel', { boardId, channelName: activeVoiceChannel })
+    }
+
+    socket.emit('joinVoiceChannel', { boardId, channelName: ch })
+    setActiveVoiceChannel(ch)
+
+    socket.emit('voiceStateUpdate', {
+      boardId,
+      channelName: ch,
+      isMuted,
+      isCameraOn,
+      isScreenSharing
+    })
+    toast.success(`Connected to voice channel: #${ch.replace('-voice', '')}`)
+  }
+
+  // Leave Voice Channel
+  const handleLeaveVoice = () => {
+    if (!activeVoiceChannel) return
+    socket.emit('leaveVoiceChannel', { boardId, channelName: activeVoiceChannel })
+    setActiveVoiceChannel(null)
+    setVoiceChannelUsers((prev) => {
+      const next = { ...prev }
+      delete next[activeVoiceChannel]
+      return next
+    })
+    toast.info('Disconnected from voice channel.')
+  }
+
+  // Toggle Media States
+  const handleToggleMute = () => {
+    const nextVal = !isMuted
+    setIsMuted(nextVal)
+    if (activeVoiceChannel) {
+      socket.emit('voiceStateUpdate', {
+        boardId,
+        channelName: activeVoiceChannel,
+        isMuted: nextVal,
+        isCameraOn,
+        isScreenSharing
+      })
+    }
+  }
+
+  const handleToggleCamera = () => {
+    const nextVal = !isCameraOn
+    setIsCameraOn(nextVal)
+    if (activeVoiceChannel) {
+      socket.emit('voiceStateUpdate', {
+        boardId,
+        channelName: activeVoiceChannel,
+        isMuted,
+        isCameraOn: nextVal,
+        isScreenSharing
+      })
+    }
+  }
+
+  const handleToggleScreenShare = () => {
+    const nextVal = !isScreenSharing
+    setIsScreenSharing(nextVal)
+    if (activeVoiceChannel) {
+      socket.emit('voiceStateUpdate', {
+        boardId,
+        channelName: activeVoiceChannel,
+        isMuted,
+        isCameraOn,
+        isScreenSharing: nextVal
+      })
+    }
+  }
+
+  // Invite user thunk
+  const handleSendInvite = async (userId) => {
+    try {
+      await dispatch(addBoardMember({ boardId, memberId: userId })).unwrap()
+      toast.success('Invitation sent successfully.')
+      setInviteSearch('')
+      setIsInviteOpen(false)
+    } catch (err) {
+      toast.error(err || 'Failed to send invite.')
+    }
+  }
+
+  // Workspace creation
   const handleCreateBoard = async (e) => {
     e.preventDefault()
     if (!title.trim()) return
@@ -193,89 +451,69 @@ const BoardsScreen = () => {
         navigate(`/boards/${resultAction.payload._id}`)
       }
     } catch (err) {
-      console.error('Error creating board:', err)
+      console.error(err)
     } finally {
       setIsCreating(false)
     }
   }
 
+  // Browse Workspaces
   const searchGlobalWorkspaces = async (query = '', filter = '') => {
-    setIsSearchingWorkspaces(true);
+    setIsSearchingWorkspaces(true)
     try {
       const response = await axiosInstance.get(`/workspaces/search`, {
-        params: { q: query, filter: filter }
-      });
-      setDiscoveryResults(response.data.workspaces || []);
+        params: { q: query, filter }
+      })
+      setDiscoveryResults(response.data.workspaces || [])
     } catch (err) {
-      console.error('Failed to discover workspaces:', err);
+      console.error(err)
     } finally {
-      setIsSearchingWorkspaces(false);
-    }
-  };
-
-  const handleJoinWorkspace = async (targetBoardId) => {
-    try {
-      await axiosInstance.post(`/workspaces/${targetBoardId}/join`);
-      alert('Joined workspace successfully!');
-      dispatch(fetchBoards());
-      searchGlobalWorkspaces(discoveryQuery, discoveryFilter);
-    } catch (err) {
-      console.error('Failed to join public workspace:', err);
-      alert(err.response?.data?.message || 'Failed to join workspace');
-    }
-  };
-
-  const handleRequestAccess = async (targetBoardId) => {
-    try {
-      await axiosInstance.post(`/workspaces/${targetBoardId}/request-access`);
-      alert('Access request sent successfully!');
-      searchGlobalWorkspaces(discoveryQuery, discoveryFilter);
-    } catch (err) {
-      console.error('Failed to request workspace access:', err);
-      alert(err.response?.data?.message || 'Failed to request access');
-    }
-  };
-
-  const handleInvite = async (userToAddId) => {
-    try {
-      const activeId = boardId || invitingBoardId
-      await dispatch(addBoardMember({ boardId: activeId, memberId: userToAddId }))
-      setIsInviteOpen(false)
-      setInvitingBoardId(null)
-      setInviteSearch('')
-    } catch (err) {
-      console.error('Invite member failed', err)
+      setIsSearchingWorkspaces(false)
     }
   }
 
-  const handleRemoveMember = async (memberId) => {
-    if (!window.confirm('Are you sure you want to remove this member?')) return;
+  const handleJoinWorkspace = async (targetBoardId) => {
     try {
-      await dispatch(removeBoardMember({ boardId, memberId })).unwrap();
+      await axiosInstance.post(`/workspaces/${targetBoardId}/join`)
+      toast.success('Joined workspace successfully!')
+      dispatch(fetchBoards())
+      searchGlobalWorkspaces(discoveryQuery, discoveryFilter)
     } catch (err) {
-      console.error('Remove member failed', err);
-      alert(err.message || 'Failed to remove member.');
+      toast.error(err.response?.data?.message || 'Failed to join workspace')
     }
-  };
+  }
 
-  const handleBlockMember = async (userId, userName) => {
-    const reason = window.prompt(`Enter block reason for ${userName}:`, 'Violating workspace policy');
-    if (reason === null) return;
+  const handleRequestAccess = async (targetBoardId) => {
     try {
-      await axiosInstance.post(`/user/block/${userId}`, { reason });
-      alert('User blocked successfully.');
-      if (boardId) {
-        dispatch(fetchBoardById(boardId));
+      await axiosInstance.post(`/workspaces/${targetBoardId}/request-access`)
+      toast.success('Access request sent successfully!')
+      searchGlobalWorkspaces(discoveryQuery, discoveryFilter)
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to request access')
+    }
+  }
+
+  // De-duplicate Owner and Members lists
+  const workspaceOwner = currentBoard?.createdBy
+  const isOwner = currentBoard && (workspaceOwner?._id === currentUserId || workspaceOwner === currentUserId)
+
+  const deDuplicatedMembers = useMemo(() => {
+    if (!currentBoard) return []
+    const members = currentBoard.members || []
+    const ownerId = (workspaceOwner?._id || workspaceOwner || '').toString()
+    const seen = new Set([ownerId])
+    const list = []
+    members.forEach((m) => {
+      const mId = (m._id || m).toString()
+      if (mId && !seen.has(mId)) {
+        seen.add(mId)
+        list.push(m)
       }
-    } catch (err) {
-      console.error('Block member failed', err);
-      alert(err.response?.data?.message || 'Failed to block member.');
-    }
-  };
+    })
+    return list
+  }, [currentBoard, workspaceOwner])
 
-
-
-  // 1. Boards Directory Dashboard (If no board selected)
+  // 1. Dashboard Landing (If no board selected)
   if (!boardId) {
     return (
       <div className="space-y-8 max-w-full">
@@ -290,7 +528,6 @@ const BoardsScreen = () => {
               </p>
             </div>
             
-            {/* Quick Stats Grid */}
             <div className="flex gap-4">
               <div className="rounded-xl bg-slate-900/60 border border-white/5 px-4 py-2 text-center">
                 <span className="text-[9px] uppercase tracking-wider text-slate-500 block">Total Boards</span>
@@ -312,7 +549,7 @@ const BoardsScreen = () => {
             <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400">All Workspaces</h2>
             <button
               onClick={() => setIsCreateModalOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white px-4 py-2 text-xs font-semibold shadow-lg shadow-sky-500/10 transition"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white px-4 py-2 text-xs font-semibold shadow-lg shadow-sky-500/10 transition cursor-pointer"
             >
               <HiOutlinePlus className="h-4 w-4" /> Create Board
             </button>
@@ -331,19 +568,6 @@ const BoardsScreen = () => {
                       <HiOutlineFolder className="h-5 w-5 text-sky-500" />
                       <span className="text-[10px] uppercase tracking-wider font-semibold">Workspace</span>
                     </div>
-                    {(board.createdBy === currentUserId || board.createdBy?._id === currentUserId) && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setInvitingBoardId(board._id);
-                          setIsInviteOpen(true);
-                        }}
-                        className="rounded bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 p-1 transition relative z-30"
-                        title="Invite Member"
-                      >
-                        <HiOutlineUserAdd className="h-3.5 w-3.5" />
-                      </button>
-                    )}
                   </div>
                   <h3 className="text-sm font-semibold text-white group-hover:text-sky-400 transition truncate">{board.title}</h3>
                   <p className="mt-1 text-[11px] text-slate-400 line-clamp-2 leading-relaxed min-h-[32px]">{board.description || 'No description provided.'}</p>
@@ -371,7 +595,6 @@ const BoardsScreen = () => {
               </div>
             ))}
 
-            {/* Create Board Inline Action */}
             <div
               onClick={() => setIsCreateModalOpen(true)}
               className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/15 bg-transparent p-6 hover:border-sky-500/40 hover:bg-sky-500/5 cursor-pointer text-slate-400 hover:text-sky-400 transition min-h-[160px]"
@@ -383,7 +606,7 @@ const BoardsScreen = () => {
           </div>
         </section>
 
-        {/* Workspace Discovery Section */}
+        {/* Discovery Section */}
         <section className="space-y-4 pt-4 border-t border-white/5">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
@@ -391,17 +614,16 @@ const BoardsScreen = () => {
               <p className="text-[11px] text-slate-500">Search and join other public or private workspaces on the platform.</p>
             </div>
             
-            {/* Search Input Bar & Filter */}
             <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
               <input
                 value={discoveryQuery}
                 onChange={(e) => setDiscoveryQuery(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
-                    searchGlobalWorkspaces(discoveryQuery, discoveryFilter);
+                    searchGlobalWorkspaces(discoveryQuery, discoveryFilter)
                   }
                 }}
-                placeholder="Search workspaces by name..."
+                placeholder="Search workspaces..."
                 className="rounded-xl border border-white/10 bg-slate-900 px-3.5 py-2 text-xs text-white outline-none focus:border-sky-500 transition w-full sm:w-60"
               />
               <select
@@ -412,8 +634,6 @@ const BoardsScreen = () => {
                 <option value="">All Workspaces</option>
                 <option value="public">Public</option>
                 <option value="private">Private</option>
-                <option value="joined">Joined</option>
-                <option value="owned">Owned</option>
               </select>
               <button
                 onClick={() => searchGlobalWorkspaces(discoveryQuery, discoveryFilter)}
@@ -428,51 +648,37 @@ const BoardsScreen = () => {
             <div className="text-center py-10 text-xs text-slate-500">Searching workspaces...</div>
           ) : discoveryResults.length === 0 ? (
             <div className="text-center py-10 text-xs text-slate-500 italic bg-slate-900/10 border border-dashed border-white/5 rounded-2xl">
-              No workspaces found. Try searching for other terms or create your own!
+              No public workspaces found.
             </div>
           ) : (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {discoveryResults.map((ws) => (
-                <div
-                  key={ws._id}
-                  className="flex flex-col justify-between rounded-2xl border border-white/10 bg-slate-900/10 p-5 hover:border-slate-800 transition"
-                >
+                <div key={ws._id} className="flex flex-col justify-between rounded-2xl border border-white/10 bg-slate-900/10 p-5 hover:border-slate-800 transition">
                   <div>
                     <div className="flex items-center justify-between text-[10px] text-slate-500 mb-3">
-                      <span className={`px-1.5 py-0.5 rounded font-bold text-[8.5px] uppercase ${
-                        ws.visibility === 'public'
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                          : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                      }`}>
-                        {ws.visibility}
-                      </span>
+                      <span className="bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded font-bold uppercase">{ws.visibility}</span>
                       <span>{ws.membersCount || 0} members</span>
                     </div>
                     <h3 className="text-sm font-semibold text-white truncate">{ws.title}</h3>
-                    <p className="mt-1 text-[11px] text-slate-400 line-clamp-2 leading-relaxed min-h-[32px]">{ws.description || 'No description.'}</p>
-                    <p className="text-[10.5px] text-sky-400 mt-2.5 font-semibold truncate">Workspace Owner: {ws.createdBy?.name || 'Unknown'}</p>
+                    <p className="mt-1 text-[11px] text-slate-400 line-clamp-2 min-h-[32px]">{ws.description}</p>
+                    <p className="text-[10.5px] text-sky-400 mt-2.5 font-semibold">Owner: {ws.createdBy?.name || 'Owner'}</p>
                   </div>
-
-                  <div className="mt-5 pt-3 border-t border-white/5 flex items-center justify-between">
+                  <div className="mt-5 pt-3 border-t border-white/5">
                     {ws.joinStatus === 'member' ? (
-                      <span className="text-xs text-emerald-400 font-bold flex items-center gap-1">
-                        ✓ Joined
-                      </span>
+                      <span className="text-xs text-emerald-400 font-bold">✓ Joined</span>
                     ) : ws.joinStatus === 'pending' ? (
-                      <span className="text-xs text-amber-400 font-bold italic">
-                        ⌛ Pending Approval
-                      </span>
+                      <span className="text-xs text-amber-400 font-bold italic">⌛ Pending Approval</span>
                     ) : ws.visibility === 'public' ? (
                       <button
                         onClick={() => handleJoinWorkspace(ws._id)}
-                        className="w-full text-center py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 rounded-xl text-xs font-bold transition"
+                        className="w-full py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 rounded-xl text-xs font-bold transition cursor-pointer"
                       >
                         Join Workspace
                       </button>
                     ) : (
                       <button
                         onClick={() => handleRequestAccess(ws._id)}
-                        className="w-full text-center py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-bold transition"
+                        className="w-full py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-bold transition cursor-pointer"
                       >
                         Request Access
                       </button>
@@ -489,7 +695,7 @@ const BoardsScreen = () => {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
             <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl relative">
               <h3 className="text-base font-semibold text-white mb-2">Create New Workspace</h3>
-              <p className="text-[11px] text-slate-400 mb-4">Set up board details. Collaborators can join via invitation.</p>
+              <p className="text-[11px] text-slate-400 mb-4">Set up board details.</p>
               
               <form onSubmit={handleCreateBoard} className="space-y-4">
                 <div>
@@ -497,7 +703,7 @@ const BoardsScreen = () => {
                   <input
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Workspace name, e.g., Sprint Plan"
+                    placeholder="Workspace name..."
                     required
                     className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3.5 py-2.5 text-xs text-slate-100 outline-none focus:border-sky-500 transition"
                   />
@@ -508,7 +714,7 @@ const BoardsScreen = () => {
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     rows={3}
-                    placeholder="Summary of scope..."
+                    placeholder="Summary..."
                     className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3.5 py-2.5 text-xs text-slate-100 outline-none focus:border-sky-500 transition"
                   />
                 </div>
@@ -523,7 +729,7 @@ const BoardsScreen = () => {
                   <button
                     type="submit"
                     disabled={isCreating}
-                    className="rounded-xl bg-sky-500 hover:bg-sky-400 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-sky-500/20 disabled:opacity-60 transition"
+                    className="rounded-xl bg-sky-500 hover:bg-sky-400 px-4 py-2 text-xs font-semibold text-white shadow-lg disabled:opacity-60 transition cursor-pointer"
                   >
                     {isCreating ? 'Creating...' : 'Create Workspace'}
                   </button>
@@ -536,303 +742,418 @@ const BoardsScreen = () => {
     )
   }
 
-  const isOwner = currentBoard && (currentBoard.createdBy?._id === currentUserId || currentBoard.createdBy === currentUserId);
-
   return (
-    <div className="flex flex-col xl:flex-row gap-6 w-full h-[calc(100vh-121px)] overflow-hidden">
-      
-      {/* Center Main Board Area */}
-      <div className="flex-1 flex flex-col min-w-0 bg-slate-950/10">
-        
-        {/* Board Header Bar */}
-        <header className="relative z-20 rounded-2xl border border-white/10 bg-slate-900/40 p-4 backdrop-blur-md mb-4 flex flex-col md:flex-row gap-4 md:items-center md:justify-between flex-shrink-0">
-          <div>
-            <div className="flex items-center gap-2 text-slate-400">
-              <HiOutlineTemplate className="h-4 w-4" />
-              <span className="text-[9px] uppercase tracking-wider font-semibold">Active Space</span>
-            </div>
-            <h2 className="mt-1 text-xl font-bold text-white truncate">{currentBoard?.title || 'Loading Board...'}</h2>
-            {currentBoard && (
-              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-400">
-                <span>Workspace Owner: <strong className="text-sky-400">{currentBoard.createdBy?.name || 'Unknown'}</strong></span>
-                <span>Board Owner: <strong className="text-sky-400">{currentBoard.createdBy?.name || 'Unknown'}</strong></span>
-                <span>Created By: <strong className="text-sky-400">{currentBoard.createdBy?.name || 'Unknown'}</strong></span>
-              </div>
-            )}
-            {currentBoard?.description && (
-              <p className="text-[10px] text-slate-400 mt-1 line-clamp-1">{currentBoard.description}</p>
-            )}
+    <div className="flex flex-col gap-4 w-full h-[calc(100vh-121px)] overflow-hidden">
+      {/* Board Header Bar */}
+      <header className="rounded-2xl border border-white/10 bg-slate-900/40 p-4 backdrop-blur-md flex flex-col md:flex-row gap-4 md:items-center md:justify-between flex-shrink-0">
+        <div>
+          <div className="flex items-center gap-2 text-slate-400">
+            <HiOutlineTemplate className="h-4 w-4 text-sky-400" />
+            <span className="text-[9px] uppercase tracking-wider font-semibold">Active Space</span>
           </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Board Members list */}
-            <div className="flex items-center gap-1 bg-slate-950/80 rounded-xl px-2 py-1.5 border border-white/5">
-              <div className="flex -space-x-1">
-                {currentBoard?.members?.slice(0, 4).map((member, idx) => (
-                  <span
-                    key={idx}
-                    className="inline-flex h-4.5 w-4.5 items-center justify-center rounded-md bg-slate-800 text-white text-[8px] font-bold border border-slate-900"
-                    title={member.name}
-                  >
-                    {member.name?.charAt(0).toUpperCase()}
-                  </span>
-                ))}
-              </div>
-              <span className="text-[9px] text-slate-400 px-1">
-                {currentBoard?.members?.length || 0} joined
-              </span>
-
-              {/* Invite teammate button removed from header to keep invite directory as single source of truth */}
-            </div>
-
-            {/* Owner Dashboard Toggle */}
-            {isOwner && (
-              <button
-                onClick={() => setShowOwnerDashboard(!showOwnerDashboard)}
-                className={`inline-flex items-center gap-1 rounded-xl px-3 py-2 text-xs font-semibold transition border ${
-                  showOwnerDashboard
-                    ? 'border-sky-500/30 bg-sky-500/10 text-sky-400 font-bold'
-                    : 'border-white/10 bg-slate-900/60 text-slate-400 hover:text-white'
-                }`}
-              >
-                Dashboard
-              </button>
-            )}
-
-            {/* Toggle right activity log */}
-            <button
-              onClick={() => setIsActivityOpen(!isActivityOpen)}
-              className={`inline-flex items-center gap-1 rounded-xl px-3 py-2 text-xs font-semibold transition border ${
-                isActivityOpen 
-                  ? 'border-sky-500/30 bg-sky-500/10 text-sky-400' 
-                  : 'border-white/10 bg-slate-900/60 text-slate-400 hover:text-white'
-              }`}
-            >
-              <HiOutlineClock className="h-4 w-4" />
-              <span className="hidden sm:inline">Activity Feed</span>
-            </button>
-          </div>
-        </header>
-
-        {/* Board content or Owner Dashboard */}
-        <div className="flex-1 overflow-y-auto">
-          {showOwnerDashboard && isOwner ? (
-            <div className="space-y-6 p-4 bg-slate-900/40 rounded-2xl border border-white/5">
-              <div>
-                <h3 className="text-base font-bold text-white">Owner Dashboard & Member Management</h3>
-                <p className="text-xs text-slate-400 mt-1">Review team status, details of task assignments, and manage roles.</p>
-              </div>
-
-              {/* Members Control Table */}
-              <div className="space-y-3">
-                <h4 className="text-xs uppercase font-bold text-slate-400 tracking-wider">Workspace Members</h4>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {currentBoard?.members?.map((member) => {
-                    const isSelf = member._id === currentUserId;
-                    return (
-                      <div key={member._id} className="rounded-xl border border-white/5 bg-slate-950/40 p-3 flex justify-between items-center text-xs">
-                        <div>
-                          <p className="font-semibold text-slate-200">{member.name}</p>
-                          <p className="text-[10px] text-slate-500">{member.email}</p>
-                        </div>
-                        {!isSelf && (
-                          <div className="flex gap-1.5">
-                            <button
-                              onClick={() => handleRemoveMember(member._id)}
-                              className="px-2.5 py-1 bg-rose-500/15 border border-rose-500/25 rounded-lg text-rose-400 hover:bg-rose-500 hover:text-white transition font-bold"
-                            >
-                              Remove
-                            </button>
-                            {member.role !== 'OWNER' && (
-                              <button
-                                onClick={() => handleBlockMember(member._id, member.name)}
-                                className="px-2.5 py-1 bg-red-600/20 border border-red-500/30 rounded-lg text-red-400 hover:bg-red-600 hover:text-white transition font-bold"
-                              >
-                                Block
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Tasks Progress Tracking Table */}
-              <div className="space-y-3">
-                <h4 className="text-xs uppercase font-bold text-slate-400 tracking-wider">Tasks Progress Tracking</h4>
-                <div className="overflow-x-auto rounded-xl border border-white/5 bg-slate-950/20">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-white/5 bg-slate-950/40 text-slate-400">
-                        <th className="p-3">Task Name</th>
-                        <th className="p-3">Assigned To</th>
-                        <th className="p-3">Progress</th>
-                        <th className="p-3">Deadline</th>
-                        <th className="p-3">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5 text-slate-300">
-                      {tasks.length > 0 ? (
-                        tasks.map((task) => (
-                          <tr key={task._id} className="hover:bg-white/5">
-                            <td className="p-3 font-semibold text-white truncate max-w-[200px]">{task.title}</td>
-                            <td className="p-3">{task.assignedTo?.name || 'Unassigned'}</td>
-                            <td className="p-3">
-                              <span className="px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 font-bold">
-                                {task.progress !== undefined ? task.progress : 0}%
-                              </span>
-                            </td>
-                            <td className="p-3">
-                              {task.dueDate ? (() => {
-                                const dl = getDeadlineInfo(task.dueDate, task.status);
-                                return (
-                                  <div className="flex flex-col gap-1">
-                                    <span>{new Date(task.dueDate).toLocaleDateString()}</span>
-                                    <span className={`text-[9px] px-1.5 py-0.5 rounded border border-white/5 w-max ${dl.className}`}>
-                                      {dl.text}
-                                    </span>
-                                  </div>
-                                );
-                              })() : <span className="text-slate-500">None</span>}
-                            </td>
-                            <td className="p-3">
-                              <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-400 uppercase font-semibold text-[9px]">
-                                {task.status}
-                              </span>
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan="5" className="p-4 text-center text-slate-500">No tasks created.</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="h-full overflow-hidden">
-              <Board boardId={boardId} />
-            </div>
+          <h2 className="mt-1 text-xl font-bold text-white truncate">{currentBoard?.title || 'Loading Board...'}</h2>
+          {currentBoard?.description && (
+            <p className="text-[10px] text-slate-400 mt-1 line-clamp-1">{currentBoard.description}</p>
           )}
         </div>
+
+        {/* Tab Selection */}
+        <div className="flex bg-slate-950/60 p-1 border border-white/10 rounded-xl">
+          {[
+            { id: 'dashboard', label: 'Dashboard' },
+            { id: 'directory', label: 'Directory' },
+            { id: 'chat', label: 'Chat' }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-1.5 text-xs font-bold rounded-lg transition ${
+                activeTab === tab.id
+                  ? 'bg-sky-500 text-slate-950 shadow-md shadow-sky-500/10'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900/30'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </header>
+
+      {/* Tabs Content */}
+      <div className="flex-1 min-h-0 overflow-hidden relative">
+        
+        {/* Tab 1: Dashboard */}
+        {activeTab === 'dashboard' && (
+          <div className="h-full flex gap-4 overflow-hidden">
+            {/* Kanban Board */}
+            <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+              <Board boardId={boardId} />
+            </div>
+
+            {/* Embedded Workspace Activity Panel */}
+            <div className="w-80 flex-shrink-0 bg-slate-900/30 border border-white/10 rounded-2xl p-4 flex flex-col min-h-0">
+              <div className="flex items-center gap-2 text-slate-400 mb-3 border-b border-white/5 pb-2">
+                <HiOutlineClock className="h-4.5 w-4.5 text-sky-400" />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Workspace Activity</span>
+              </div>
+              <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 custom-scrollbar">
+                {activities.length > 0 ? (
+                  activities.map((act) => (
+                    <div key={act._id} className="p-3 bg-slate-950/40 border border-white/5 rounded-xl text-xs space-y-1">
+                      <div className="flex justify-between items-center text-[9px] text-slate-500 font-semibold">
+                        <span className="text-slate-400">{act.userName}</span>
+                        <span>{new Date(act.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                      <p className="text-slate-300 leading-normal">{act.message}</p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-20 text-xs text-slate-500 italic">
+                    No recent activities recorded.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 2: Directory */}
+        {activeTab === 'directory' && (
+          <div className="h-full grid gap-6 md:grid-cols-3 overflow-y-auto p-1 custom-scrollbar">
+            {/* Members Directory */}
+            <div className="md:col-span-2 space-y-6">
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Workspace Directory</h3>
+                
+                {/* Invite Dropdown Trigger */}
+                <div className="relative">
+                  <button
+                    onClick={() => setIsInviteOpen(!isInviteOpen)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-xl text-xs transition cursor-pointer"
+                  >
+                    <HiOutlineUserAdd className="h-4 w-4" /> Invite Member
+                  </button>
+
+                  {/* Discord Style invite dropdown */}
+                  {isInviteOpen && (
+                    <div className="absolute right-0 mt-2 z-40 w-80 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl p-4 space-y-3">
+                      <div className="flex justify-between items-center">
+                        <h4 className="text-xs font-bold text-white uppercase">Invite teammate</h4>
+                        <button onClick={() => setIsInviteOpen(false)} className="text-slate-500 hover:text-slate-200">✕</button>
+                      </div>
+                      <input
+                        value={inviteSearch}
+                        onChange={(e) => setInviteSearch(e.target.value)}
+                        placeholder="Search by name or email..."
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-white placeholder-slate-600 outline-none focus:border-sky-500"
+                      />
+                      <div className="max-h-48 overflow-y-auto space-y-1.5 custom-scrollbar pr-1">
+                        {isSearching ? (
+                          <div className="text-center py-4 text-[11px] text-slate-500">Searching...</div>
+                        ) : searchResults.length > 0 ? (
+                          searchResults.map((user) => (
+                            <div key={user._id} className="flex justify-between items-center p-2 rounded-xl bg-slate-950/40 border border-white/5 text-[11px] gap-2">
+                              <div className="min-w-0">
+                                <p className="font-bold text-slate-200 truncate">{user.name}</p>
+                                <p className="text-slate-500 text-[10px] truncate">{user.email}</p>
+                              </div>
+                              {user.inviteStatus === 'pending' ? (
+                                <span className="bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded font-semibold text-[10px]">Pending</span>
+                              ) : (
+                                <button
+                                  onClick={() => handleSendInvite(user._id)}
+                                  className="px-2 py-1 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-lg transition"
+                                >
+                                  Invite
+                                </button>
+                              )}
+                            </div>
+                          ))
+                        ) : inviteSearch.trim() ? (
+                          <div className="text-center py-4 text-[11px] text-slate-500">No users found.</div>
+                        ) : (
+                          <div className="text-center py-4 text-[10px] text-slate-500">Type name or email to search.</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* OWNER SECTION */}
+              <div className="space-y-2">
+                <span className="text-[10px] uppercase font-bold text-sky-400 block tracking-widest">OWNER</span>
+                {workspaceOwner ? (
+                  <div className="p-3 bg-slate-900/40 border border-white/5 rounded-2xl flex items-center gap-3">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 text-white font-bold text-sm">
+                      {workspaceOwner.name ? workspaceOwner.name.charAt(0).toUpperCase() : 'O'}
+                    </span>
+                    <div>
+                      <p className="font-bold text-white text-xs">{workspaceOwner.name || 'Workspace Owner'}</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">{workspaceOwner.email}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500 italic">No workspace owner resolved.</p>
+                )}
+              </div>
+
+              {/* MEMBERS SECTION */}
+              <div className="space-y-2">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block tracking-widest">MEMBERS ({deDuplicatedMembers.length})</span>
+                <div className="space-y-2 max-h-[40vh] overflow-y-auto custom-scrollbar pr-1">
+                  {deDuplicatedMembers.length > 0 ? (
+                    deDuplicatedMembers.map((member) => (
+                      <div key={member._id} className="p-3 bg-slate-900/30 border border-white/5 rounded-2xl flex justify-between items-center gap-3">
+                        <div className="flex items-center gap-3">
+                          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-slate-300 font-semibold text-xs">
+                            {member.name ? member.name.charAt(0).toUpperCase() : 'M'}
+                          </span>
+                          <div>
+                            <p className="font-semibold text-white text-xs">{member.name}</p>
+                            <p className="text-[10px] text-slate-500 mt-0.5">{member.email}</p>
+                          </div>
+                        </div>
+
+                        {/* Eviction Button only for owner */}
+                        {isOwner && (
+                          <button
+                            onClick={() => handleEvictMember(member._id)}
+                            className="px-2.5 py-1 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500 text-rose-400 hover:text-white transition rounded-xl text-[10px] font-bold cursor-pointer"
+                          >
+                            Evict
+                          </button>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-6 text-xs text-slate-600 italic">
+                      No other team members have joined this workspace yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Leave / Workspace ownership administration */}
+            <div className="bg-slate-900/20 border border-white/10 rounded-2xl p-5 space-y-5 h-max">
+              <div>
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider">Workspace Admin</h4>
+                <p className="text-[10px] text-slate-500 mt-0.5">Manage your workspace access and permissions.</p>
+              </div>
+
+              {isOwner ? (
+                <div className="space-y-4 pt-2 border-t border-white/5">
+                  {/* Ownership Transfer */}
+                  <form onSubmit={handleTransfer} className="space-y-1.5">
+                    <label className="block text-[9px] uppercase font-bold text-slate-400">Transfer Ownership (User ID)</label>
+                    <div className="flex gap-2">
+                      <input
+                        value={newOwnerId}
+                        onChange={(e) => setNewOwnerId(e.target.value)}
+                        placeholder="Paste user id..."
+                        className="flex-1 bg-slate-950 border border-white/10 rounded-xl px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                      />
+                      <button
+                        type="submit"
+                        className="px-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[10px] rounded-xl transition cursor-pointer"
+                      >
+                        Transfer
+                      </button>
+                    </div>
+                  </form>
+
+                  {/* Permanent delete workspace */}
+                  <div className="pt-2 border-t border-white/5 space-y-1.5">
+                    <span className="block text-[9px] uppercase font-bold text-rose-400">Caution Zone</span>
+                    <button
+                      onClick={handleDeleteBoardWorkspace}
+                      className="w-full py-2 bg-rose-500/20 hover:bg-rose-500 text-white font-bold rounded-xl text-xs transition cursor-pointer"
+                    >
+                      Delete Board Workspace
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="pt-2 border-t border-white/5 space-y-2">
+                  <p className="text-[10px] text-slate-500">You are a Workspace Member. You can choose to leave this workspace. This removes your card assignments.</p>
+                  <button
+                    onClick={handleLeaveWorkspace}
+                    className="w-full py-2 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500 hover:text-white text-rose-400 font-bold rounded-xl text-xs transition cursor-pointer"
+                  >
+                    Leave Workspace
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Tab 3: Chat */}
+        {activeTab === 'chat' && (
+          <div className="h-full flex overflow-hidden bg-slate-900/10 border border-white/10 rounded-2xl">
+            {/* Left channels sidebar */}
+            <div className="w-56 bg-slate-950 border-r border-white/10 p-3 flex flex-col flex-shrink-0 justify-between">
+              <div className="space-y-4">
+                {/* Text Channels */}
+                <div>
+                  <h4 className="text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-2 pl-2">Text Channels</h4>
+                  <div className="space-y-0.5 overflow-y-auto max-h-40 pr-1 custom-scrollbar">
+                    {textChannels.map((ch) => {
+                      const lowerCh = ch.toLowerCase()
+                      const unread = unreadCounts[lowerCh] || 0
+                      return (
+                        <button
+                          key={ch}
+                          onClick={() => {
+                            setActiveChatChannel(lowerCh)
+                            setUnreadCounts((prev) => ({ ...prev, [lowerCh]: 0 }))
+                            axiosInstance.post(`/boards/${boardId}/chat/read`, { channel: lowerCh }).catch(console.error)
+                          }}
+                          className={`w-full flex items-center justify-between py-1.5 px-2.5 rounded-lg text-xs font-semibold text-left transition ${
+                            activeChatChannel?.toLowerCase() === lowerCh
+                              ? 'bg-sky-500/15 text-sky-400 border border-sky-500/20 shadow-inner'
+                              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/30'
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <span>#</span>
+                            <span className="truncate max-w-[120px]">{lowerCh}</span>
+                          </span>
+                          {unread > 0 && (
+                            <span className="bg-sky-500 text-slate-950 px-1.5 py-0.2 rounded-full text-[9px] font-bold">{unread}</span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Voice Channels */}
+                <div>
+                  <h4 className="text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-2 pl-2">Voice Channels</h4>
+                  <div className="space-y-1">
+                    {voiceChannels.map((ch) => {
+                      const usersInCh = Object.entries(voiceChannelUsers[ch] || {})
+                      const isCallActive = activeVoiceChannel === ch
+                      return (
+                        <div key={ch} className="space-y-0.5">
+                          <button
+                            onClick={() => handleJoinVoice(ch)}
+                            className={`w-full flex items-center justify-between py-1.5 px-2.5 rounded-lg text-xs font-semibold text-left transition ${
+                              isCallActive
+                                ? 'bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/25'
+                                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/30'
+                            }`}
+                          >
+                            <span className="flex items-center gap-1.5">
+                              <span>🔊</span>
+                              <span className="truncate max-w-[120px]">{ch.replace('-voice', '')}</span>
+                            </span>
+                            {isCallActive && (
+                              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+                            )}
+                          </button>
+
+                          {/* Users in call */}
+                          {usersInCh.length > 0 && (
+                            <div className="pl-5 space-y-1 ml-1.5 border-l border-white/5 py-0.5">
+                              {usersInCh.map(([uid, uState]) => (
+                                <div key={uid} className="flex justify-between items-center text-[10.5px] text-slate-400 py-0.2">
+                                  <span className="truncate max-w-[100px]">{uState.userName}</span>
+                                  <div className="flex gap-1 items-center flex-shrink-0">
+                                    {uState.isMuted && <span title="Muted" className="text-[9px]">🔇</span>}
+                                    {uState.isCameraOn && <span title="Camera On" className="text-[9px]">📷</span>}
+                                    {uState.isScreenSharing && <span title="Screen Sharing" className="text-[9px]">🖥️</span>}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Persistent Voice Controls inside sidebar */}
+              {activeVoiceChannel && (
+                <div className="pt-2 border-t border-white/5 space-y-2 bg-slate-950/60 p-2 rounded-xl">
+                  <div className="min-w-0">
+                    <p className="text-[9px] uppercase tracking-[0.1em] text-emerald-400 font-bold flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+                      Voice Active
+                    </p>
+                    <p className="text-[10px] font-bold text-white truncate mt-0.5">#{activeVoiceChannel.replace('-voice', '')}</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-4 gap-1">
+                    <button
+                      onClick={handleToggleMute}
+                      className={`p-1.5 rounded bg-slate-900 border border-white/5 hover:border-slate-800 text-xs flex items-center justify-center ${
+                        isMuted ? 'text-rose-400 bg-rose-500/10' : 'text-slate-300'
+                      }`}
+                      title={isMuted ? 'Unmute microphone' : 'Mute microphone'}
+                    >
+                      {isMuted ? <MuteIcon /> : <MicIcon />}
+                    </button>
+                    <button
+                      onClick={handleToggleCamera}
+                      className={`p-1.5 rounded bg-slate-900 border border-white/5 hover:border-slate-800 text-xs flex items-center justify-center ${
+                        isCameraOn ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-300'
+                      }`}
+                      title={isCameraOn ? 'Turn camera off' : 'Turn camera on'}
+                    >
+                      <CameraIcon />
+                    </button>
+                    <button
+                      onClick={handleToggleScreenShare}
+                      className={`p-1.5 rounded bg-slate-900 border border-white/5 hover:border-slate-800 text-xs flex items-center justify-center ${
+                        isScreenSharing ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-300'
+                      }`}
+                      title={isScreenSharing ? 'Stop screen sharing' : 'Share screen'}
+                    >
+                      <ScreenIcon />
+                    </button>
+                    <button
+                      onClick={handleLeaveVoice}
+                      className="p-1.5 rounded bg-rose-600 border border-rose-500/20 text-white text-xs flex items-center justify-center hover:bg-rose-700"
+                      title="Disconnect Call"
+                    >
+                      <DisconnectIcon />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Inline chat content pane */}
+            <div className="flex-1 min-w-0 h-full relative">
+              {activeChatChannel ? (
+                <ChatDrawer
+                  boardId={boardId}
+                  channel={activeChatChannel}
+                  currentBoard={currentBoard}
+                  isInline={true}
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center text-slate-500 text-xs italic">
+                  Select a text channel on the left to display conversation history.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Dockable Right Workspace Panel */}
-      {isActivityOpen && (
-        <aside className="w-full xl:w-76 flex-shrink-0 flex flex-col h-full bg-slate-950 border-l border-white/10 overflow-hidden rounded-2xl xl:rounded-none">
-          <div className="flex-1 overflow-hidden">
-            <WorkspaceSidePanel
-              boardId={boardId}
-              currentBoard={currentBoard}
-              onlineUsers={onlineUsers}
-              onSelectTextChannel={(ch) => setActiveChatChannel(ch)}
-              activeChatChannel={activeChatChannel}
-            />
-          </div>
-        </aside>
-      )}
-
-      {/* Sliding Discord-style Chat Drawer */}
-      {activeChatChannel && (
-        <ChatDrawer
-          boardId={boardId}
-          channel={activeChatChannel}
-          currentBoard={currentBoard}
-          onClose={() => setActiveChatChannel(null)}
-        />
-      )}
-
-      {/* Task Details Right-Side Slide-Over Drawer */}
+      {/* Slide-over Task Details drawer */}
       <TaskDetailsDrawer
         taskId={taskId}
         boardId={boardId}
         isOpen={Boolean(taskId)}
         onClose={() => navigate(`/boards/${boardId}`)}
       />
-
-      {/* Invite Member Central Modal */}
-      {isInviteOpen && invitingBoardId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl relative">
-            <button
-              onClick={() => {
-                setIsInviteOpen(false);
-                setInvitingBoardId(null);
-                setInviteSearch('');
-              }}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white"
-            >
-              ✕
-            </button>
-            <h3 className="text-base font-semibold text-white mb-2">Invite Members to Workspace</h3>
-            <p className="text-[11px] text-slate-400 mb-4">Search registered users to invite them to this board.</p>
-            
-            <input
-              value={inviteSearch}
-              onChange={(e) => setInviteSearch(e.target.value)}
-              placeholder="Search by name, username or email..."
-              className="w-full rounded-xl border border-white/10 bg-slate-950 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 outline-none focus:border-sky-500 transition mb-4"
-            />
-            <div className="max-h-56 overflow-y-auto space-y-1.5 custom-scrollbar">
-              {isSearching ? (
-                <p className="text-[10px] text-slate-400 text-center py-4">Searching...</p>
-              ) : searchResults.length > 0 ? (
-                searchResults.map((u) => (
-                  <div 
-                    key={u._id}
-                    className="flex justify-between items-center p-3 bg-slate-950/40 rounded-xl border border-white/5 text-xs gap-3"
-                  >
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={u.avatar}
-                        alt={u.name}
-                        className="w-9 h-9 rounded-xl border border-white/10"
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(u.name)}`;
-                        }}
-                      />
-                      <div>
-                        <p className="font-bold text-white">{u.name}</p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">{u.email}</p>
-                        {u.role && (
-                          <span className="text-[8px] uppercase font-bold text-sky-400 bg-sky-500/10 px-1.5 py-0.2 rounded mt-1 inline-block">
-                            {u.role}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      {u.inviteStatus === 'member' ? (
-                        <span className="text-[10px] text-slate-500 font-semibold">Already Added</span>
-                      ) : u.inviteStatus === 'pending' ? (
-                        <span className="text-[10px] text-amber-500/55 font-semibold">Pending</span>
-                      ) : (
-                        <button
-                          onClick={() => handleInvite(u._id)}
-                          className="px-3 py-1.5 bg-sky-500 hover:bg-sky-400 rounded-xl text-[10px] text-white font-bold transition cursor-pointer"
-                        >
-                          Invite
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))
-              ) : inviteSearch.trim() ? (
-                <p className="text-[10px] text-slate-500 text-center py-4">No users found.</p>
-              ) : (
-                <p className="text-[10px] text-slate-500 text-center py-4">Type to search registered users.</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
     </div>
   )
 }

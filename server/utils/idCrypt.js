@@ -170,22 +170,6 @@ export const encryptUserIds = (data) => {
           }
         } else if (['createdBy', 'assignedTo', 'recipient', 'sender', 'members', 'collaborators', 'replyTo', 'mentions'].includes(key)) {
           clone[key] = encryptUserIds(val);
-        } else if (key === 'comments' || key === 'messages') {
-          if (Array.isArray(val)) {
-            clone[key] = val.map(c => {
-              if (c && typeof c === 'object') {
-                const commentClone = typeof c.toObject === 'function' ? c.toObject({ getters: false, virtuals: false }) : { ...c };
-                if (commentClone.userId) commentClone.userId = encryptUserIds(commentClone.userId);
-                if (commentClone.senderId) commentClone.senderId = encryptUserIds(commentClone.senderId);
-                if (commentClone._id) commentClone._id = encryptId(commentClone._id.toString());
-                if (commentClone.id) commentClone.id = encryptId(commentClone.id.toString());
-                return commentClone;
-              }
-              return c;
-            });
-          } else {
-            clone[key] = val;
-          }
         } else {
           clone[key] = encryptUserIds(val);
         }

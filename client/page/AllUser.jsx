@@ -104,7 +104,7 @@ const AllUser = () => {
                   <div className="mt-5 flex items-center justify-between gap-2 border-t border-white/5 pt-4">
                     <div className="text-xs text-slate-400">
                       <p>
-                        <span className="text-slate-300 font-medium">Role:</span> <span className={`px-1.5 py-0.5 rounded font-semibold text-[10px] ${user.role === 'OWNER' ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20' : 'bg-slate-800 text-slate-400'}`}>{user.role || 'MEMBER'}</span>
+                        <span className="text-slate-300 font-medium">Role:</span> <span className={`px-1.5 py-0.5 rounded font-semibold text-[10px] ${user.role === 'ADMIN' ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20' : 'bg-slate-800 text-slate-400'}`}>{user.role || 'USER'}</span>
                       </p>
                       {user.isBlocked && user.reason && (
                         <p className="mt-1 text-rose-400/80 text-[10px] italic">
@@ -112,7 +112,7 @@ const AllUser = () => {
                         </p>
                       )}
                     </div>
-                    {currentRole === 'OWNER' && user._id !== currentUserId && user.role !== 'OWNER' && (
+                    {currentRole === 'ADMIN' && user._id !== currentUserId && user.role !== 'ADMIN' && (
                       <div>
                         {user.isBlocked ? (
                           <button

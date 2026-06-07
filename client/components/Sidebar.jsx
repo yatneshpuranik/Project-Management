@@ -7,7 +7,6 @@ const navItems = [
   { label: 'Dashboard', to: '/boards', icon: HiOutlineHome, end: true },
   { label: 'Boards', to: '/boards', icon: HiOutlineViewBoards },
   { label: 'Analytics', to: '/analytics', icon: HiOutlineChartBar },
-  { label: 'Activities', to: '/all-users', icon: HiOutlineClock },
   { label: 'Profile', to: '/profile', icon: HiOutlineUser },
   { label: 'Settings', to: '/settings', icon: HiOutlineCog },
 ]
@@ -20,7 +19,7 @@ const Sidebar = ({ onLinkClick }) => {
 
   const userRole = localStorage.getItem('userRole')
   const userEmail = localStorage.getItem('userEmail')
-  const isAdmin = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN' || userEmail === 'yatnesh@admin.com'
+  const isAdmin = userRole === 'ADMIN'
 
   // If Admin, only show the Admin Panel link. Remove normal workspace routes.
   const items = isAdmin

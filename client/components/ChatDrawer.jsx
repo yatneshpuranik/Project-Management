@@ -4,7 +4,7 @@ import axiosInstance from '../utils/axiosInstance';
 import socket from '../utils/socket';
 import { toast } from '../utils/toast';
 
-const ChatDrawer = ({ boardId, channel, currentBoard, onClose }) => {
+const ChatDrawer = ({ boardId, channel, currentBoard, onClose, isInline = false }) => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -391,7 +391,7 @@ const ChatDrawer = ({ boardId, channel, currentBoard, onClose }) => {
   }, [typingUsers]);
 
   return (
-    <div className="fixed inset-y-0 right-0 z-40 w-full sm:w-[460px] bg-slate-950/95 border-l border-white/10 shadow-2xl flex flex-col transform translate-x-0 transition-transform duration-300 ease-out backdrop-blur-md">
+    <div className={isInline ? "w-full h-full bg-slate-950/60 flex flex-col min-h-0 relative rounded-2xl border border-white/5" : "fixed inset-y-0 right-0 z-40 w-full sm:w-[460px] bg-slate-950/95 border-l border-white/10 shadow-2xl flex flex-col transform translate-x-0 transition-transform duration-300 ease-out backdrop-blur-md"}>
       
       {/* Header */}
       <div className="p-4 border-b border-white/10 flex items-center justify-between bg-slate-900/60 flex-shrink-0">
@@ -402,12 +402,14 @@ const ChatDrawer = ({ boardId, channel, currentBoard, onClose }) => {
           </div>
           <p className="text-[10px] text-slate-400 mt-0.5">Text Channel Chat</p>
         </div>
-        <button
-          onClick={onClose}
-          className="text-slate-400 hover:text-white p-1.5 hover:bg-slate-800 rounded-lg transition"
-        >
-          <HiOutlineX className="h-5 w-5" />
-        </button>
+        {!isInline && (
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-white p-1.5 hover:bg-slate-800 rounded-lg transition"
+          >
+            <HiOutlineX className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
       {/* Messages list */}

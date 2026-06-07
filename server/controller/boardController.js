@@ -15,8 +15,8 @@ export const createBoard = async (req, res) => {
     const userId = req.userId;
 
     const user = await User.findById(userId);
-    if (!user || (user.role !== 'OWNER' && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
-      return res.status(403).json({ message: 'Forbidden: Only users with role OWNER or ADMIN can create workspaces' });
+    if (!user || (user.role !== 'USER' && user.role !== 'ADMIN')) {
+      return res.status(403).json({ message: 'Forbidden: Only users with role USER or ADMIN can create workspaces' });
     }
 
     if (!title) {

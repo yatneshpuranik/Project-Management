@@ -86,25 +86,7 @@ const SettingsScreen = () => {
     setChannels(prev => prev.filter(c => c !== ch));
   };
 
-  const handlePromoteUser = async (userId) => {
-    try {
-      await axiosInstance.post(`/user/promote/${userId}`);
-      alert('User promoted to Owner role successfully.');
-      if (currentBoard?._id) dispatch(fetchBoardById(currentBoard._id));
-    } catch (err) {
-      alert(err.response?.data?.message || 'Failed to promote user');
-    }
-  };
 
-  const handleDemoteUser = async (userId) => {
-    try {
-      await axiosInstance.post(`/user/demote/${userId}`);
-      alert('User demoted to Member role successfully.');
-      if (currentBoard?._id) dispatch(fetchBoardById(currentBoard._id));
-    } catch (err) {
-      alert(err.response?.data?.message || 'Failed to demote user');
-    }
-  };
 
   if (!currentBoard) {
     return (
