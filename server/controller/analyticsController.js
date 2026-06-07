@@ -1,5 +1,8 @@
 import Task from '../model/task.js';
 import Board from '../model/board.js';
+import User from '../model/userModel.js';
+import Activity from '../model/activity.js';
+import { encryptUserIds, encryptId } from '../utils/idCrypt.js';
 
 export const getBoardAnalytics = async (req, res) => {
   try {
@@ -19,7 +22,7 @@ export const getBoardAnalytics = async (req, res) => {
       return res.status(403).json({ message: 'Unauthorized access' });
     }
 
-    const allTasks = await Task.find({ boardId }).populate('assignedTo', 'name');
+    const allTasks = await Task.find({ boardId }).populate('assignedTo', 'name email avatar');
     const totalTasks = allTasks.length;
     const completedTasks = allTasks.filter((task) => task.status === 'Done').length;
     const pendingTasks = allTasks.filter((task) => task.status !== 'Done').length;
@@ -118,6 +121,66 @@ export const getBoardAnalytics = async (req, res) => {
       totalAssigned,
     };
 
+    // MEMBER ANALYTICS
+    const memberIds = [board.createdBy.toString(), ...board.members.map(m => m.toString())];
+    const users = await User.find({ _id: { $in: memberIds } }).select('name email role avatar presenceStatus lastActive');
+
+    const memberAnalytics = users.map(user => {
+      const uId = user._id.toString();
+      const userTasks = allTasks.filter(t => t.assignedTo?._id.toString() === uId);
+      const userAssignedCount = userTasks.length;
+      const userCompletedCount = userTasks.filter(t => t.status === 'Done').length;
+      const userCompletionRate = userAssignedCount === 0 ? 0 : Number(((userCompletedCount / userAssignedCount) * 100).toFixed(1));
+
+      // Calculate member cycle time
+      let userCycleTimeMs = 0;
+      let userCompletedWithTime = 0;
+      userTasks.filter(t => t.status === 'Done').forEach(task => {
+        const duration = new Date(task.updatedAt).getTime() - new Date(task.createdAt).getTime();
+        if (duration >= 0) {
+          userCycleTimeMs += duration;
+          userCompletedWithTime++;
+        }
+      });
+      const avgCompletionTime = userCompletedWithTime === 0 ? 0 : Number((userCycleTimeMs / (userCompletedWithTime * 24 * 60 * 60 * 1000)).toFixed(1));
+
+      const isWorking = userTasks.some(t => t.status === 'In Progress');
+
+      return {
+        _id: encryptId(user._id),
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar,
+        presenceStatus: user.presenceStatus || 'Offline',
+        lastActive: user.lastActive,
+        tasksAssigned: userAssignedCount,
+        tasksCompleted: userCompletedCount,
+        completionRate: userCompletionRate,
+        averageCompletionTime: avgCompletionTime,
+        status: isWorking ? 'Working' : 'Idle',
+        currentTask: isWorking ? userTasks.find(t => t.status === 'In Progress').title : null,
+      };
+    });
+
+    // OWNER DASHBOARD DATA
+    const recentActivities = await Activity.find({ boardId })
+      .sort({ createdAt: -1 })
+      .limit(10);
+
+    const deadlines = allTasks
+      .filter(t => t.dueDate && t.status !== 'Done')
+      .map(t => ({
+        _id: encryptId(t._id),
+        title: t.title,
+        status: t.status,
+        progress: t.progress || 0,
+        dueDate: t.dueDate,
+        assignee: t.assignedTo ? t.assignedTo.name : 'Unassigned',
+      }))
+      .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
+      .slice(0, 10);
+
     res.status(200).json({
       message: 'Analytics fetched successfully',
       analytics: {
@@ -134,6 +197,11 @@ export const getBoardAnalytics = async (req, res) => {
         activeBacklog,
         burnDown,
         workloadDistribution,
+        memberAnalytics: memberAnalytics,
+        ownerDashboard: {
+          recentActivities: recentActivities,
+          deadlines: deadlines,
+        }
       },
     });
   } catch (error) {

@@ -22,6 +22,21 @@ const boardSchema = new mongoose.Schema(
         ref: 'User',
       },
     ],
+    visibility: {
+      type: String,
+      enum: ['public', 'private'],
+      default: 'private',
+    },
+    requests: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
+    channels: {
+      type: [String],
+      default: ['general', 'development', 'testing', 'announcements'],
+    },
     isArchived: {
       type: Boolean,
       default: false,

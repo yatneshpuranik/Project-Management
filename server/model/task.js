@@ -51,7 +51,6 @@ const taskSchema = new mongoose.Schema(
     },
     progress: {
       type: Number,
-      enum: [0, 25, 50, 75, 100],
       default: 0,
     },
     attachments: [
@@ -90,6 +89,23 @@ const taskSchema = new mongoose.Schema(
         createdAt: {
           type: Date,
           default: Date.now,
+        },
+      },
+    ],
+    parentTaskId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Task',
+    },
+    checklist: [
+      {
+        text: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        completed: {
+          type: Boolean,
+          default: false,
         },
       },
     ],

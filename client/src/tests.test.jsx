@@ -159,7 +159,7 @@ describe('MERN Kanban SaaS Audit Test Suite', () => {
       expect(header).toHaveClass('z-20');
 
       // Dropdown should be initially hidden
-      expect(screen.queryByPlaceholderText('Search name or email...')).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText('Search by name or email...')).not.toBeInTheDocument();
 
       // Click invite button
       const inviteBtn = screen.getByTitle('Invite Teammate');
@@ -168,7 +168,7 @@ describe('MERN Kanban SaaS Audit Test Suite', () => {
       });
 
       // Dropdown should be visible
-      expect(screen.getByPlaceholderText('Search name or email...')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Search by name or email...')).toBeInTheDocument();
     });
   });
 

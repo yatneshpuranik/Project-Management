@@ -10,8 +10,7 @@ const boardChatMessageSchema = new mongoose.Schema(
     },
     channel: {
       type: String,
-      enum: ['General', 'Development', 'Testing', 'Announcements'],
-      default: 'General',
+      default: 'general',
       required: true,
     },
     senderId: {
@@ -38,6 +37,32 @@ const boardChatMessageSchema = new mongoose.Schema(
     editedAt: {
       type: Date,
     },
+    replyTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'BoardChatMessage',
+    },
+    mentions: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
+    reactions: [
+      {
+        userId: {
+          type: String,
+          required: true,
+        },
+        userName: {
+          type: String,
+          required: true,
+        },
+        emoji: {
+          type: String,
+          required: true,
+        },
+      },
+    ],
   },
   {
     timestamps: true,

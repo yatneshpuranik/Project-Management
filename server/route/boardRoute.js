@@ -7,6 +7,11 @@ import {
   deleteBoard,
   addMember,
   removeMember,
+  searchWorkspaces,
+  joinPublicWorkspace,
+  requestAccess,
+  acceptAccessRequest,
+  rejectAccessRequest
 } from '../controller/boardController.js';
 import {
   getBoardChatMessages,
@@ -21,6 +26,13 @@ const router = express.Router();
 
 // Protect all routes
 router.use(authenticateToken);
+
+// Board / Workspace Discovery & Requests Routes (Must be before parametrized routes)
+router.get('/search', searchWorkspaces);
+router.post('/:boardId/join', joinPublicWorkspace);
+router.post('/:boardId/request-access', requestAccess);
+router.post('/:boardId/requests/:userId/accept', acceptAccessRequest);
+router.post('/:boardId/requests/:userId/reject', rejectAccessRequest);
 
 // Board Routes
 router.post('/', createBoard);

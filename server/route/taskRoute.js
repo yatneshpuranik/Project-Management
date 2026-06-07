@@ -17,6 +17,9 @@ import {
   addChatMessage,
   updateChatMessage,
   deleteChatMessage,
+  addTaskChecklistItem,
+  updateTaskChecklistItem,
+  deleteTaskChecklistItem,
 } from '../controller/taskController.js';
 import { authenticateToken } from '../middleware/auth.js';
 
@@ -35,6 +38,11 @@ router.delete('/:taskId', deleteTask);
 router.post('/:taskId/invite', inviteToTask);
 router.post('/:taskId/join', joinTask);
 router.post('/:taskId/leave', leaveTask);
+
+// Checklist Routes
+router.post('/:taskId/checklist', addTaskChecklistItem);
+router.put('/:taskId/checklist/:itemId', updateTaskChecklistItem);
+router.delete('/:taskId/checklist/:itemId', deleteTaskChecklistItem);
 
 // Comment Routes
 router.get('/:taskId/comments', getComments);

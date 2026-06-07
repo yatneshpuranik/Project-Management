@@ -20,12 +20,23 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['board_invite', 'task_invite', 'task_assign'],
+      enum: [
+        'board_invite',
+        'task_invite',
+        'task_assign',
+        'task_reassign',
+        'deadline_reminder',
+        'mention',
+        'member_joined',
+        'member_removed',
+        'task_completed',
+        'workspace_message'
+      ],
       required: true,
     },
     status: {
       type: String,
-      enum: ['pending', 'accepted', 'rejected', 'read', 'unread'],
+      enum: ['pending', 'accepted', 'rejected', 'read', 'unread', 'archived'],
       default: 'pending',
     },
     boardId: {

@@ -68,14 +68,36 @@ const Navbar = ({ toggleSidebar }) => {
       toast.info(`Task assignment removed: "${data.taskTitle}"`);
     };
 
+    const handleMemberAdded = (data) => {
+      const currentUserId = localStorage.getItem('userId') || user._id;
+      dispatch(fetchBoards());
+      if (data.member._id === currentUserId) {
+        toast.success(`You have been added to the workspace: "${data.board.title}"`);
+      } else {
+        toast.info(`${data.member.name} joined the workspace: "${data.board.title}"`);
+      }
+    };
+
+    const handleInviteRejected = (data) => {
+      const currentUserId = localStorage.getItem('userId') || user._id;
+      if (data.notification.recipient === currentUserId) {
+        fetchInboxNotifications();
+        toast.warning(`${data.inviteeName} rejected your invitation to join workspace: "${data.notification.boardTitle}"`);
+      }
+    };
+
     socket.on('invitationSent', handleInviteSent);
     socket.on('taskAssigned', handleTaskAssigned);
     socket.on('taskUnassigned', handleTaskUnassigned);
+    socket.on('memberAdded', handleMemberAdded);
+    socket.on('memberInviteRejected', handleInviteRejected);
 
     return () => {
       socket.off('invitationSent', handleInviteSent);
       socket.off('taskAssigned', handleTaskAssigned);
       socket.off('taskUnassigned', handleTaskUnassigned);
+      socket.off('memberAdded', handleMemberAdded);
+      socket.off('memberInviteRejected', handleInviteRejected);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?._id]);

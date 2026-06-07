@@ -1,6 +1,10 @@
 import Activity from '../model/activity.js';
 import Board from '../model/board.js';
+import Task from '../model/task.js';
 import { getIo } from '../socket/socket.js';
+
+const isBoardMember = (board, userId) =>
+  board && (board.createdBy.toString() === userId || board.members.some((member) => member.toString() === userId));
 
 export const getActivitiesByBoard = async (req, res) => {
   try {
@@ -12,11 +16,7 @@ export const getActivitiesByBoard = async (req, res) => {
       return res.status(404).json({ message: 'Board not found' });
     }
 
-    const isMember =
-      board.createdBy.toString() === userId ||
-      board.members.some((member) => member.toString() === userId);
-
-    if (!isMember) {
+    if (!isBoardMember(board, userId)) {
       return res.status(403).json({ message: 'Unauthorized access' });
     }
 
@@ -25,6 +25,31 @@ export const getActivitiesByBoard = async (req, res) => {
       .limit(50);
 
     res.status(200).json({ message: 'Activities fetched successfully', activities });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching activities', error: error.message });
+  }
+};
+
+export const getActivitiesByTask = async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const userId = req.userId;
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    const board = await Board.findById(task.boardId);
+    if (!isBoardMember(board, userId)) {
+      return res.status(403).json({ message: 'Unauthorized access' });
+    }
+
+    const activities = await Activity.find({ taskId })
+      .sort({ createdAt: -1 })
+      .limit(50);
+
+    res.status(200).json({ message: 'Task activities fetched successfully', activities });
   } catch (error) {
     res.status(500).json({ message: 'Error fetching activities', error: error.message });
   }

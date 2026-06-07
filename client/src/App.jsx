@@ -16,6 +16,7 @@ import Toast from '../components/Toast.jsx'
 import DashboardLayout from '../components/DashboardLayout.jsx'
 import AnalyticsScreen from '../page/AnalyticsScreen.jsx'
 import SettingsScreen from '../page/SettingsScreen.jsx'
+import AdminDashboard from '../page/AdminDashboard.jsx'
 
 const App = () => {
   const dispatch = useDispatch()
@@ -101,6 +102,7 @@ const App = () => {
             <Route path='/all-users' element={<AllUser />} />
             <Route path='/analytics' element={<AnalyticsScreen />} />
             <Route path='/settings' element={<SettingsScreen />} />
+            <Route path='/admin' element={<AdminDashboard />} />
           </Route>
 
           <Route path='*' element={<Navigate to='/' replace />} />

@@ -73,6 +73,19 @@ const TaskDetailsDrawer = ({ taskId, boardId, isOpen, onClose }) => {
     return unique;
   }, [currentBoard]);
 
+  const { tasks: allTasks } = useSelector((state) => state.tasks);
+
+  const [newChecklistText, setNewChecklistText] = useState('');
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+
+  const subtasks = useMemo(() => {
+    return allTasks.filter((t) => {
+      const parentId = t.parentTaskId?._id || t.parentTaskId;
+      const currentId = task?._id || taskId;
+      return parentId === currentId;
+    });
+  }, [allTasks, taskId, task]);
+
   // Load task details
   const fetchTaskDetails = async () => {
     if (!taskId) return;
@@ -81,17 +94,13 @@ const TaskDetailsDrawer = ({ taskId, boardId, isOpen, onClose }) => {
       const [taskRes, commentsRes, activityRes] = await Promise.all([
         axiosInstance.get(`/tasks/${taskId}`),
         axiosInstance.get(`/tasks/${taskId}/comments`),
-        axiosInstance.get(`/activity/board/${boardId}`),
+        axiosInstance.get(`/activity/task/${taskId}`),
       ]);
 
       const taskData = taskRes.data.task;
       setTask(taskData);
       setComments(commentsRes.data.comments || []);
-      
-      const relatedActivities = (activityRes.data.activities || []).filter(
-        act => act.taskId === taskId
-      );
-      setActivities(relatedActivities);
+      setActivities(activityRes.data.activities || []);
 
       // Initialize form fields
       setTitle(taskData.title || '');
@@ -130,7 +139,6 @@ const TaskDetailsDrawer = ({ taskId, boardId, isOpen, onClose }) => {
 
     const onTaskUpdated = (data) => {
       if (data.task?._id === taskId) {
-        // Refresh local state if updated by someone else
         setTask(data.task);
         setTitle(data.task.title || '');
         setDescription(data.task.description || '');
@@ -161,6 +169,97 @@ const TaskDetailsDrawer = ({ taskId, boardId, isOpen, onClose }) => {
       socket.off('activity-created', onActivityCreated);
     };
   }, [isOpen, taskId]);
+
+  // Checklist Actions
+  const handleToggleChecklistItem = async (itemId, currentCompleted) => {
+    try {
+      const response = await axiosInstance.put(`/tasks/${taskId}/checklist/${itemId}`, {
+        completed: !currentCompleted
+      });
+      const updatedTask = response.data.task;
+      setTask(updatedTask);
+      setProgress(updatedTask.progress);
+      
+      // Update task list in Redux
+      dispatch(fetchTasksByBoard(boardId));
+
+      socket.emit('task-updated', { boardId, task: updatedTask });
+    } catch (err) {
+      console.error('Failed to toggle checklist item:', err);
+      toast.error('Failed to update checklist item');
+    }
+  };
+
+  const handleDeleteChecklistItem = async (itemId) => {
+    try {
+      const response = await axiosInstance.delete(`/tasks/${taskId}/checklist/${itemId}`);
+      const updatedTask = response.data.task;
+      setTask(updatedTask);
+      setProgress(updatedTask.progress);
+      
+      // Update task list in Redux
+      dispatch(fetchTasksByBoard(boardId));
+
+      socket.emit('task-updated', { boardId, task: updatedTask });
+      toast.success('Checklist item deleted');
+    } catch (err) {
+      console.error('Failed to delete checklist item:', err);
+      toast.error('Failed to delete checklist item');
+    }
+  };
+
+  const handleAddChecklistItem = async (e) => {
+    e.preventDefault();
+    if (!newChecklistText.trim()) return;
+    try {
+      const response = await axiosInstance.post(`/tasks/${taskId}/checklist`, {
+        text: newChecklistText.trim()
+      });
+      const updatedTask = response.data.task;
+      setTask(updatedTask);
+      setProgress(updatedTask.progress);
+      setNewChecklistText('');
+      
+      // Update task list in Redux
+      dispatch(fetchTasksByBoard(boardId));
+
+      socket.emit('task-updated', { boardId, task: updatedTask });
+      toast.success('Checklist item added');
+    } catch (err) {
+      console.error('Failed to add checklist item:', err);
+      toast.error('Failed to add checklist item');
+    }
+  };
+
+  // Subtask Actions
+  const handleAddSubtask = async (e) => {
+    e.preventDefault();
+    if (!newSubtaskTitle.trim()) return;
+    try {
+      const subtaskData = {
+        title: newSubtaskTitle.trim(),
+        boardId,
+        parentTaskId: taskId,
+        priority: 'Low',
+        status: 'Todo',
+      };
+      const response = await axiosInstance.post('/tasks', subtaskData);
+      const newSub = response.data.task;
+      setNewSubtaskTitle('');
+      
+      dispatch(fetchTasksByBoard(boardId));
+
+      socket.emit('task-created', { boardId, task: newSub });
+      toast.success('Subtask created successfully');
+    } catch (err) {
+      console.error('Failed to create subtask:', err);
+      toast.error('Failed to create subtask');
+    }
+  };
+
+  const handleNavigateToTask = (targetTaskId) => {
+    navigate(`/boards/${boardId}/tasks/${targetTaskId}`);
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -396,9 +495,17 @@ const TaskDetailsDrawer = ({ taskId, boardId, isOpen, onClose }) => {
                     max="100"
                     step="25"
                     value={progress}
+                    disabled={Boolean(task?.checklist && task.checklist.length > 0)}
                     onChange={(e) => setProgress(e.target.value)}
-                    className="w-full h-1.5 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                    className={`w-full h-1.5 bg-slate-950 rounded-lg appearance-none accent-sky-500 ${
+                      task?.checklist && task.checklist.length > 0 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+                    }`}
                   />
+                  {task?.checklist && task.checklist.length > 0 && (
+                    <p className="text-[10px] text-slate-500 italic mt-1">
+                      Progress is managed automatically by checklist completion.
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -479,6 +586,172 @@ const TaskDetailsDrawer = ({ taskId, boardId, isOpen, onClose }) => {
                   )}
                 </div>
               </form>
+
+              {/* Checklist Section */}
+              <section className="rounded-2xl border border-white/10 bg-slate-950/50 p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <HiOutlineClipboardList className="h-4 w-4 text-sky-400" />
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">Checklist</h4>
+                  </div>
+                  <span className="text-[10px] text-sky-400 font-bold bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 rounded">
+                    {task?.checklist?.length || 0} items
+                  </span>
+                </div>
+
+                {/* Progress bar */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                    <span>Checklist Progress</span>
+                    <span>{progress}%</span>
+                  </div>
+                  <div className="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className="bg-sky-500 h-1.5 rounded-full transition-all duration-300"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Checklist items list */}
+                <div className="space-y-2">
+                  {task?.checklist && task.checklist.length > 0 ? (
+                    task.checklist.map((item) => (
+                      <div key={item._id} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/60 border border-white/5 group/chk">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <input
+                            type="checkbox"
+                            checked={item.completed}
+                            onChange={() => handleToggleChecklistItem(item._id, item.completed)}
+                            className="rounded border-white/10 bg-slate-950 text-sky-500 focus:ring-sky-500 h-4 w-4 cursor-pointer"
+                          />
+                          <span className={`text-xs text-slate-300 truncate ${item.completed ? 'line-through text-slate-500' : ''}`}>
+                            {item.text}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteChecklistItem(item._id)}
+                          className="opacity-0 group-hover/chk:opacity-100 p-1 hover:bg-slate-800 text-slate-500 hover:text-rose-400 rounded transition"
+                          title="Delete Checklist Item"
+                        >
+                          <HiOutlineTrash className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-[11px] text-slate-500 italic">No checklist items added yet.</p>
+                  )}
+                </div>
+
+                {/* Add Checklist Item input */}
+                <div className="flex gap-2 pt-1">
+                  <input
+                    value={newChecklistText}
+                    onChange={(e) => setNewChecklistText(e.target.value)}
+                    placeholder="Add a checklist item..."
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleAddChecklistItem(e);
+                      }
+                    }}
+                    className="flex-1 rounded-xl border border-white/10 bg-slate-900 px-3 py-1.5 text-xs text-white outline-none focus:border-sky-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddChecklistItem}
+                    disabled={!newChecklistText.trim()}
+                    className="rounded-xl bg-slate-100 hover:bg-white text-slate-950 px-3.5 py-1.5 text-xs font-bold transition disabled:opacity-50"
+                  >
+                    Add
+                  </button>
+                </div>
+              </section>
+
+              {/* Subtasks Section */}
+              <section className="rounded-2xl border border-white/10 bg-slate-950/50 p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {/* Inline subtask icon */}
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-4 h-4 text-sky-400">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.75a3 3 0 003-3v-3.75a3 3 0 00-3-3h-3.75M6 6.75H12M6 12h6m-6 5.25h6" />
+                    </svg>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">Subtasks</h4>
+                  </div>
+                  <span className="text-[10px] text-sky-400 font-bold bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 rounded">
+                    {subtasks.length} subtasks
+                  </span>
+                </div>
+
+                {/* Parent Task indicator if this is a subtask */}
+                {task?.parentTaskId && (
+                  <div className="p-2.5 rounded-xl bg-sky-500/5 border border-sky-500/20 text-xs flex items-center justify-between">
+                    <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Parent Task</span>
+                    <button
+                      type="button"
+                      onClick={() => handleNavigateToTask(task.parentTaskId._id || task.parentTaskId)}
+                      className="text-sky-400 hover:underline font-semibold truncate max-w-[200px]"
+                    >
+                      {task.parentTaskId.title || 'View Parent Task'}
+                    </button>
+                  </div>
+                )}
+
+                {/* Subtasks List */}
+                <div className="space-y-2">
+                  {subtasks.length > 0 ? (
+                    subtasks.map((sub) => (
+                      <div
+                        key={sub._id}
+                        onClick={() => handleNavigateToTask(sub._id)}
+                        className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/60 border border-white/5 hover:border-slate-800 hover:bg-slate-900 cursor-pointer transition text-xs"
+                      >
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <p className="font-semibold text-slate-200 truncate">{sub.title}</p>
+                          <div className="flex gap-2 text-[10px] text-slate-500">
+                            <span>{sub.status}</span>
+                            <span>•</span>
+                            <span className="text-sky-400">{sub.progress}%</span>
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0 flex items-center gap-1.5">
+                          {sub.assignedTo && (
+                            <span className="rounded-full bg-slate-800 text-[9px] px-1.5 py-0.5 text-slate-400 font-semibold">
+                              {sub.assignedTo.name?.split(' ')[0]}
+                            </span>
+                          )}
+                          <HiOutlineChevronRight className="h-4.5 w-4.5 text-slate-500" />
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-[11px] text-slate-500 italic">No subtasks added yet.</p>
+                  )}
+                </div>
+
+                {/* Add Subtask Form */}
+                <div className="flex gap-2 pt-1">
+                  <input
+                    value={newSubtaskTitle}
+                    onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                    placeholder="New subtask title..."
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleAddSubtask(e);
+                      }
+                    }}
+                    className="flex-1 rounded-xl border border-white/10 bg-slate-900 px-3 py-1.5 text-xs text-white outline-none focus:border-sky-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddSubtask}
+                    disabled={!newSubtaskTitle.trim()}
+                    className="rounded-xl bg-slate-100 hover:bg-white text-slate-950 px-3.5 py-1.5 text-xs font-bold transition disabled:opacity-50"
+                  >
+                    Create
+                  </button>
+                </div>
+              </section>
 
               {/* Collaborators (Open Contributor Mode Panel) */}
               <section className="rounded-2xl border border-white/10 bg-slate-950/50 p-5 space-y-4">

@@ -11,6 +11,7 @@ import attachmentRoute from "./route/attachmentRoute.js";
 import activityRoute from "./route/activityRoute.js";
 import analyticsRoute from "./route/analyticsRoute.js";
 import notificationRoute from "./route/notificationRoute.js";
+import adminRoute from "./route/adminRoute.js";
 import setupSocket from "./socket/socket.js";
 import cookieParser from "cookie-parser";
 import cors from "cors";
@@ -53,11 +54,13 @@ app.use(cookieParser());
 // Routes
 app.use("/api/user", userRoute);
 app.use("/api/boards", boardRoute);
+app.use("/api/workspaces", boardRoute);
 app.use("/api/tasks", taskRoute);
 app.use("/api/attachments", attachmentRoute);
 app.use("/api/activity", activityRoute);
 app.use("/api/analytics", analyticsRoute);
 app.use("/api/notifications", notificationRoute);
+app.use("/api/admin", adminRoute);
 
 import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);

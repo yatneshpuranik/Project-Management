@@ -362,3 +362,175 @@ export const unblockUser = async (req, res) => {
         });
     }
 };
+
+export const searchUsers = async (req, res) => {
+    try {
+        const { q, boardId } = req.query;
+        if (!q || !q.trim()) {
+            return res.status(200).json({
+                success: true,
+                users: []
+            });
+        }
+
+        const searchQuery = q.trim();
+        const users = await User.find({
+            isBlocked: { $ne: true },
+            $or: [
+                { name: { $regex: searchQuery, $options: 'i' } },
+                { email: { $regex: searchQuery, $options: 'i' } }
+            ]
+        })
+        .select('name email role avatar')
+        .limit(10);
+
+        const Notification = (await import('../model/notification.js')).default;
+        
+        let board = null;
+        let pendingInvites = [];
+        if (boardId) {
+            board = await Board.findById(boardId);
+            pendingInvites = await Notification.find({
+                boardId,
+                type: 'board_invite',
+                status: 'pending'
+            });
+        }
+
+        const safeUsers = users.map(user => {
+            const u = user.toObject();
+            let inviteStatus = 'none';
+            if (board) {
+                const isMember = board.createdBy.toString() === u._id.toString() ||
+                                 board.members.some(m => m.toString() === u._id.toString());
+                if (isMember) {
+                    inviteStatus = 'member';
+                } else {
+                    const hasPending = pendingInvites.some(inv => inv.recipient.toString() === u._id.toString());
+                    if (hasPending) {
+                        inviteStatus = 'pending';
+                    }
+                }
+            }
+            
+            const encryptedUser = encryptUserIds(u);
+            encryptedUser.inviteStatus = inviteStatus;
+            return encryptedUser;
+        });
+
+        return res.status(200).json({
+            success: true,
+            users: safeUsers
+        });
+    } catch (err) {
+        console.error("Error searching users:", err);
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+};
+
+export const promoteUser = async (req, res) => {
+    try {
+        const currentRole = req.user?.role;
+        if (currentRole !== 'OWNER' && currentRole !== 'ADMIN') {
+            return res.status(403).json({ success: false, message: 'Forbidden: Owner or Admin permissions required' });
+        }
+
+        const { userId } = req.params;
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        user.role = 'OWNER';
+        await user.save();
+
+        return res.status(200).json({
+            success: true,
+            message: 'User promoted to Owner successfully',
+            user: encryptUserIds(user)
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+export const demoteUser = async (req, res) => {
+    try {
+        const currentRole = req.user?.role;
+        if (currentRole !== 'OWNER' && currentRole !== 'ADMIN') {
+            return res.status(403).json({ success: false, message: 'Forbidden: Owner or Admin permissions required' });
+        }
+
+        const { userId } = req.params;
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        if (user.email === 'yatnesh@admin.com') {
+            return res.status(400).json({ success: false, message: 'Cannot demote the primary admin account' });
+        }
+
+        user.role = 'MEMBER';
+        await user.save();
+
+        return res.status(200).json({
+            success: true,
+            message: 'User demoted to Member successfully',
+            user: encryptUserIds(user)
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+export const updatePresence = async (req, res) => {
+    try {
+        const { status } = req.body;
+        if (!['Online', 'Offline', 'Away', 'Busy'].includes(status)) {
+            return res.status(400).json({ success: false, message: 'Invalid presence status' });
+        }
+
+        const user = await User.findById(req.userId);
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        user.presenceStatus = status;
+        user.lastActive = new Date();
+        await user.save();
+
+        // Broadcast presence update via Socket.io
+        try {
+            const { getIo } = await import('../socket/socket.js');
+            const io = getIo();
+            if (io) {
+                // Find all boards user is a member of to broadcast status change
+                const boards = await Board.find({
+                    $or: [{ createdBy: req.userId }, { members: req.userId }]
+                });
+                boards.forEach(b => {
+                    io.to(`board-${b._id.toString()}`).emit('presence-update', {
+                        userId: encryptId(req.userId),
+                        status,
+                        lastActive: user.lastActive
+                    });
+                });
+            }
+        } catch (e) {
+            console.error('Failed to broadcast presence update:', e);
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Presence status updated',
+            presenceStatus: status,
+            lastActive: user.lastActive
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};

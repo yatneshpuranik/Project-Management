@@ -1,7 +1,7 @@
 
 import { NavLink, useNavigate, useParams } from 'react-router-dom'
 import { useSelector } from 'react-redux'
-import { HiOutlineHome, HiOutlineViewBoards, HiOutlineChartBar, HiOutlineClock, HiOutlineUser, HiOutlineCog } from 'react-icons/hi'
+import { HiOutlineHome, HiOutlineViewBoards, HiOutlineChartBar, HiOutlineClock, HiOutlineUser, HiOutlineCog, HiOutlineShieldCheck } from 'react-icons/hi'
 
 const navItems = [
   { label: 'Dashboard', to: '/boards', icon: HiOutlineHome, end: true },
@@ -16,6 +16,15 @@ const Sidebar = ({ onLinkClick }) => {
   const navigate = useNavigate()
   const { boardId: activeBoardId } = useParams()
   const { boards } = useSelector((state) => state.boards)
+
+  const userRole = localStorage.getItem('userRole')
+  const userEmail = localStorage.getItem('userEmail')
+  const isAdmin = userRole === 'ADMIN' || userEmail === 'yatnesh@admin.com'
+
+  const items = [...navItems]
+  if (isAdmin) {
+    items.push({ label: 'Admin Panel', to: '/admin', icon: HiOutlineShieldCheck })
+  }
 
   const handleSelectBoard = (id) => {
     navigate(`/boards/${id}`)
@@ -33,7 +42,7 @@ const Sidebar = ({ onLinkClick }) => {
         <div className="space-y-2">
           <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-500">Navigation</p>
           <nav className="space-y-1">
-            {navItems.map((item) => {
+            {items.map((item) => {
               const Icon = item.icon
               return (
                 <NavLink

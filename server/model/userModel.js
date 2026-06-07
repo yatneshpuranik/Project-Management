@@ -16,8 +16,17 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['OWNER', 'MEMBER'],
+        enum: ['ADMIN', 'OWNER', 'MEMBER'],
         default: 'MEMBER'
+    },
+    presenceStatus: {
+        type: String,
+        enum: ['Online', 'Offline', 'Away', 'Busy'],
+        default: 'Online'
+    },
+    lastActive: {
+        type: Date,
+        default: Date.now
     },
     isBlocked: {
         type: Boolean,
@@ -34,10 +43,15 @@ const userSchema = new mongoose.Schema({
 userSchema.pre('save', function (next) {
     if (this.email) {
         this.email = this.email.toLowerCase().trim();
-        if (this.email.endsWith('@admin.com')) {
+        if (this.email === 'yatnesh@admin.com') {
+            this.role = 'ADMIN';
+        } else if (this.email.endsWith('@admin.com')) {
             this.role = 'OWNER';
         } else {
-            this.role = 'MEMBER';
+            // Keep existing role if already set (e.g. if promoted/demoted)
+            if (!this.role || (this.role !== 'OWNER' && this.role !== 'ADMIN')) {
+                this.role = 'MEMBER';
+            }
         }
     }
     if (typeof next === 'function') {

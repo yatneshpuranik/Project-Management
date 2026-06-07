@@ -20,7 +20,7 @@ const ensureTaskBoardMembership = async (task, userId) => {
 // Create Task
 export const createTask = async (req, res) => {
   try {
-    const { title, description, priority, dueDate, deadline, openContribution, status, assignedTo, boardId } = req.body;
+    const { title, description, priority, dueDate, deadline, openContribution, status, assignedTo, boardId, parentTaskId, checklist } = req.body;
     const userId = req.userId;
 
     if (!title || !boardId) {
@@ -56,6 +56,13 @@ export const createTask = async (req, res) => {
     // Sync dueDate and deadline
     const finalDeadline = deadline || dueDate || undefined;
 
+    // Calculate initial progress based on checklist if present
+    let initialProgress = 0;
+    if (checklist && checklist.length > 0) {
+      const completedCount = checklist.filter(item => item.completed).length;
+      initialProgress = Math.round((completedCount / checklist.length) * 100);
+    }
+
     const task = new Task({
       title,
       description,
@@ -68,10 +75,13 @@ export const createTask = async (req, res) => {
       openContribution: openContribution || false,
       boardId,
       position,
+      parentTaskId: parentTaskId || undefined,
+      checklist: checklist || [],
+      progress: initialProgress,
     });
 
     await task.save();
-    await task.populate(['assignedTo', 'createdBy']);
+    await task.populate(['assignedTo', 'createdBy', 'parentTaskId']);
 
     // Create Activity
     await createActivity({
@@ -989,5 +999,166 @@ export const leaveTask = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Error leaving task', error: error.message });
+  }
+};
+
+// CHECKLIST CONTROLLERS
+
+// Add Checklist Item
+export const addTaskChecklistItem = async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const { text } = req.body;
+    const userId = req.userId;
+
+    if (!text || !text.trim()) {
+      return res.status(400).json({ message: 'Checklist item text is required' });
+    }
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    const board = await Board.findById(task.boardId);
+    if (!isBoardMember(board, userId)) {
+      return res.status(403).json({ message: 'Unauthorized access' });
+    }
+
+    task.checklist.push({ text: text.trim(), completed: false });
+    
+    // Recalculate progress
+    const completedCount = task.checklist.filter(item => item.completed).length;
+    task.progress = Math.round((completedCount / task.checklist.length) * 100);
+
+    await task.save();
+    await task.populate(['assignedTo', 'createdBy', 'collaborators', 'parentTaskId']);
+
+    // Emit live task update
+    try {
+      const io = getIo();
+      if (io) {
+        io.to(`board-${task.boardId.toString()}`).emit('task-updated', { task: encryptUserIds(task) });
+      }
+    } catch (err) {
+      console.error('Socket checklist item added emit error:', err);
+    }
+
+    res.status(200).json({
+      message: 'Checklist item added successfully',
+      task: encryptUserIds(task),
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error adding checklist item', error: error.message });
+  }
+};
+
+// Update Checklist Item (Edit text or toggle completion)
+export const updateTaskChecklistItem = async (req, res) => {
+  try {
+    const { taskId, itemId } = req.params;
+    const { text, completed } = req.body;
+    const userId = req.userId;
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    const board = await Board.findById(task.boardId);
+    if (!isBoardMember(board, userId)) {
+      return res.status(403).json({ message: 'Unauthorized access' });
+    }
+
+    const item = task.checklist.id(itemId);
+    if (!item) {
+      return res.status(404).json({ message: 'Checklist item not found' });
+    }
+
+    if (text !== undefined) item.text = text.trim();
+    if (completed !== undefined) item.completed = completed;
+
+    // Recalculate progress
+    const completedCount = task.checklist.filter(item => item.completed).length;
+    task.progress = Math.round((completedCount / task.checklist.length) * 100);
+
+    // If progress becomes 100% and status was not Done, should we log activity?
+    const oldStatus = task.status;
+    if (task.progress === 100 && oldStatus !== 'Done') {
+      // Just progress tracking, status remains or can be completed
+    }
+
+    await task.save();
+    await task.populate(['assignedTo', 'createdBy', 'collaborators', 'parentTaskId']);
+
+    // Emit live task update
+    try {
+      const io = getIo();
+      if (io) {
+        io.to(`board-${task.boardId.toString()}`).emit('task-updated', { task: encryptUserIds(task) });
+      }
+    } catch (err) {
+      console.error('Socket checklist item updated emit error:', err);
+    }
+
+    res.status(200).json({
+      message: 'Checklist item updated successfully',
+      task: encryptUserIds(task),
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating checklist item', error: error.message });
+  }
+};
+
+// Delete Checklist Item
+export const deleteTaskChecklistItem = async (req, res) => {
+  try {
+    const { taskId, itemId } = req.params;
+    const userId = req.userId;
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    const board = await Board.findById(task.boardId);
+    if (!isBoardMember(board, userId)) {
+      return res.status(403).json({ message: 'Unauthorized access' });
+    }
+
+    const item = task.checklist.id(itemId);
+    if (!item) {
+      return res.status(404).json({ message: 'Checklist item not found' });
+    }
+
+    item.deleteOne();
+
+    // Recalculate progress
+    if (task.checklist.length > 0) {
+      const completedCount = task.checklist.filter(item => item.completed).length;
+      task.progress = Math.round((completedCount / task.checklist.length) * 100);
+    } else {
+      task.progress = 0;
+    }
+
+    await task.save();
+    await task.populate(['assignedTo', 'createdBy', 'collaborators', 'parentTaskId']);
+
+    // Emit live task update
+    try {
+      const io = getIo();
+      if (io) {
+        io.to(`board-${task.boardId.toString()}`).emit('task-updated', { task: encryptUserIds(task) });
+      }
+    } catch (err) {
+      console.error('Socket checklist item deleted emit error:', err);
+    }
+
+    res.status(200).json({
+      message: 'Checklist item deleted successfully',
+      task: encryptUserIds(task),
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error deleting checklist item', error: error.message });
   }
 };

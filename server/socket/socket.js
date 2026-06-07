@@ -760,8 +760,109 @@ const setupSocket = (io) => {
       });
     });
 
+    // Reactions Event Handlers
+    socket.on('workspaceReactionAdded', async (data) => {
+      const { boardId, messageId, emoji } = data;
+      const decBoardId = decryptId(boardId);
+      const decMessageId = decryptId(messageId);
+      const room = `board-chat-${decBoardId}`;
+      const decUserId = socket.userId;
+      const userName = socket.userName;
+
+      try {
+        const message = await BoardChatMessage.findById(decMessageId);
+        if (!message) return;
+
+        if (!message.reactions) {
+          message.reactions = [];
+        }
+        if (!message.reactions.some(r => r.userId === decUserId && r.emoji === emoji)) {
+          message.reactions.push({ userId: decUserId, userName, emoji });
+          await message.save();
+
+          io.to(room).emit('workspaceReactionAdded', {
+            boardId: encryptId(decBoardId),
+            messageId: encryptId(decMessageId),
+            reaction: { userId: encryptId(decUserId), userName, emoji }
+          });
+        }
+      } catch (err) {
+        console.error('Socket workspaceReactionAdded error:', err);
+      }
+    });
+
+    socket.on('workspaceReactionRemoved', async (data) => {
+      const { boardId, messageId, emoji } = data;
+      const decBoardId = decryptId(boardId);
+      const decMessageId = decryptId(messageId);
+      const room = `board-chat-${decBoardId}`;
+      const decUserId = socket.userId;
+
+      try {
+        const message = await BoardChatMessage.findById(decMessageId);
+        if (!message) return;
+
+        if (message.reactions) {
+          message.reactions = message.reactions.filter(r => !(r.userId === decUserId && r.emoji === emoji));
+          await message.save();
+
+          io.to(room).emit('workspaceReactionRemoved', {
+            boardId: encryptId(decBoardId),
+            messageId: encryptId(decMessageId),
+            userId: encryptId(decUserId),
+            emoji
+          });
+        }
+      } catch (err) {
+        console.error('Socket workspaceReactionRemoved error:', err);
+      }
+    });
+
+    // Voice Channel Event Handlers
+    socket.on('joinVoiceChannel', (data) => {
+      const { boardId, channelName } = data;
+      const decBoardId = decryptId(boardId);
+      const room = `board-voice-${decBoardId}-${channelName}`;
+      socket.join(room);
+      
+      socket.to(`board-${decBoardId}`).emit('userJoinedVoice', {
+        userId: encryptId(socket.userId),
+        userName: socket.userName,
+        channelName
+      });
+      console.log(`User ${socket.userId} joined voice channel ${channelName} in board ${decBoardId}`);
+    });
+
+    socket.on('leaveVoiceChannel', (data) => {
+      const { boardId, channelName } = data;
+      const decBoardId = decryptId(boardId);
+      const room = `board-voice-${decBoardId}-${channelName}`;
+      socket.leave(room);
+
+      socket.to(`board-${decBoardId}`).emit('userLeftVoice', {
+        userId: encryptId(socket.userId),
+        userName: socket.userName,
+        channelName
+      });
+      console.log(`User ${socket.userId} left voice channel ${channelName} in board ${decBoardId}`);
+    });
+
+    socket.on('voiceStateUpdate', (data) => {
+      const { boardId, channelName, isMuted, isCameraOn, isScreenSharing } = data;
+      const decBoardId = decryptId(boardId);
+      
+      socket.to(`board-${decBoardId}`).emit('voiceStateUpdated', {
+        userId: encryptId(socket.userId),
+        userName: socket.userName,
+        channelName,
+        isMuted,
+        isCameraOn,
+        isScreenSharing
+      });
+    });
+
     // Handle disconnection
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
       console.log(`User disconnected: ${socket.id}`);
 
       const dUserId = socket.userId;
@@ -771,6 +872,25 @@ const setupSocket = (io) => {
           userSockets.get(dUserId).delete(socket.id);
           if (userSockets.get(dUserId).size === 0) {
             userSockets.delete(dUserId);
+            
+            // Set User presence to Offline in database since last socket disconnected
+            try {
+              await User.findByIdAndUpdate(dUserId, { presenceStatus: 'Offline', lastActive: new Date() });
+              
+              // Broadcast presence offline to all their boards
+              const boards = await Board.find({
+                $or: [{ createdBy: dUserId }, { members: dUserId }]
+              });
+              boards.forEach(b => {
+                socket.to(`board-${b._id.toString()}`).emit('presence-update', {
+                  userId: encryptId(dUserId),
+                  status: 'Offline',
+                  lastActive: new Date()
+                });
+              });
+            } catch (err) {
+              console.error('Socket disconnect user presence update failed:', err);
+            }
           }
         }
 

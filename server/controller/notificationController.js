@@ -5,7 +5,7 @@ import Task from '../model/task.js';
 import User from '../model/userModel.js';
 import { createActivity } from './activityController.js';
 import { encryptUserIds, encryptId } from '../utils/idCrypt.js';
-import { getIo } from '../socket/socket.js';
+import { getIo, emitToUser } from '../socket/socket.js';
 
 // Get notifications for current user
 export const getNotifications = async (req, res) => {
@@ -74,6 +74,39 @@ export const respondToInvitation = async (req, res) => {
           type: 'Invitation Accepted',
           message: `${userName} accepted invitation to join workspace "${board.title}"`,
         });
+
+        // Socket events for member added
+        try {
+          const io = getIo();
+          const encryptedUser = encryptUserIds(user);
+          const encryptedBoard = encryptUserIds(board);
+          
+          if (io) {
+            // Emit to board room
+            io.to(`board-${board._id.toString()}`).emit('memberAdded', {
+              boardId: encryptId(board._id),
+              member: encryptedUser,
+              board: encryptedBoard,
+            });
+          }
+          
+          // Emit to user who accepted
+          emitToUser(userId, 'memberAdded', {
+            boardId: encryptId(board._id),
+            member: encryptedUser,
+            board: encryptedBoard,
+          });
+
+          // Emit to board creator (owner)
+          emitToUser(board.createdBy, 'memberAdded', {
+            boardId: encryptId(board._id),
+            member: encryptedUser,
+            board: encryptedBoard,
+          });
+        } catch (err) {
+          console.error('Socket memberAdded emit error:', err);
+        }
+
       } else {
         await createActivity({
           boardId: board._id,
@@ -82,6 +115,37 @@ export const respondToInvitation = async (req, res) => {
           type: 'Invitation Rejected',
           message: `${userName} declined invitation to join workspace "${board.title}"`,
         });
+
+        // Create notification for the owner
+        const rejectionNotification = new Notification({
+          recipient: notification.sender, // Owner
+          sender: userId, // Rejecting user
+          senderName: userName,
+          type: 'board_invite',
+          status: 'rejected',
+          boardId: board._id,
+          boardTitle: board.title,
+          message: `${userName} rejected your invitation to join workspace: "${board.title}"`,
+        });
+        await rejectionNotification.save();
+
+        // Socket events for invitation rejected
+        try {
+          emitToUser(notification.sender, 'memberInviteRejected', {
+            boardId: encryptId(board._id),
+            inviteeId: encryptId(userId),
+            inviteeName: userName,
+            notification: encryptUserIds(rejectionNotification),
+          });
+
+          // Send notification to owner's inbox in real-time
+          emitToUser(notification.sender, 'invitationSent', {
+            recipientId: encryptId(notification.sender),
+            notification: encryptUserIds(rejectionNotification),
+          });
+        } catch (err) {
+          console.error('Socket rejection notification emit error:', err);
+        }
       }
 
       // Socket update to board room
