@@ -20,6 +20,9 @@ import {
   addTaskChecklistItem,
   updateTaskChecklistItem,
   deleteTaskChecklistItem,
+  claimTask,
+  releaseTask,
+  takeOwnership,
 } from '../controller/taskController.js';
 import { authenticateToken } from '../middleware/auth.js';
 
@@ -38,6 +41,9 @@ router.delete('/:taskId', deleteTask);
 router.post('/:taskId/invite', inviteToTask);
 router.post('/:taskId/join', joinTask);
 router.post('/:taskId/leave', leaveTask);
+router.post('/:taskId/claim', claimTask);
+router.post('/:taskId/release', releaseTask);
+router.post('/:taskId/take-ownership', takeOwnership);
 
 // Checklist Routes
 router.post('/:taskId/checklist', addTaskChecklistItem);

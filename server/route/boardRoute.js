@@ -11,7 +11,8 @@ import {
   joinPublicWorkspace,
   requestAccess,
   acceptAccessRequest,
-  rejectAccessRequest
+  rejectAccessRequest,
+  leaveBoard
 } from '../controller/boardController.js';
 import {
   getBoardChatMessages,
@@ -44,6 +45,7 @@ router.delete('/:boardId', deleteBoard);
 // Member Routes
 router.post('/:boardId/members', addMember);
 router.delete('/:boardId/members/:memberId', removeMember);
+router.post('/:boardId/leave', leaveBoard);
 
 // Workspace Chat Routes
 router.get('/:boardId/chat', getBoardChatMessages);

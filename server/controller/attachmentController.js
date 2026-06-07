@@ -1,6 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import mongoose from 'mongoose';
 import Task from '../model/task.js';
 import Attachment from '../model/attachment.js';
 import Board from '../model/board.js';
@@ -11,6 +12,13 @@ export const uploadAttachment = async (req, res) => {
     const { taskId } = req.params;
     const userId = req.userId;
     const userName = req.userName || 'Unknown';
+
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      if (req.file && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      return res.status(400).json({ message: 'Invalid task ID format' });
+    }
 
     const task = await Task.findById(taskId);
     if (!task) {
@@ -71,6 +79,10 @@ export const getTaskAttachments = async (req, res) => {
     const { taskId } = req.params;
     const userId = req.userId;
 
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ message: 'Invalid task ID format' });
+    }
+
     const task = await Task.findById(taskId).populate('attachments');
     if (!task) {
       return res.status(404).json({ message: 'Task not found' });
@@ -95,6 +107,10 @@ export const downloadAttachment = async (req, res) => {
   try {
     const { attachmentId } = req.params;
     const userId = req.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(attachmentId)) {
+      return res.status(400).json({ message: 'Invalid attachment ID format' });
+    }
 
     const attachment = await Attachment.findById(attachmentId);
     if (!attachment) {

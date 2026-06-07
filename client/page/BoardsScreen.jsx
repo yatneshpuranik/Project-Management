@@ -12,6 +12,7 @@ import {
 import Board from '../components/Board.jsx'
 import WorkspaceSidePanel from '../components/WorkspaceSidePanel.jsx'
 import TaskDetailsDrawer from '../components/TaskDetailsDrawer.jsx'
+import ChatDrawer from '../components/ChatDrawer.jsx'
 import axiosInstance from '../utils/axiosInstance'
 import socket from '../utils/socket'
 import { HiOutlineClock, HiOutlinePlus, HiOutlineUserAdd, HiOutlineFolder, HiOutlineTemplate, HiOutlineSparkles } from 'react-icons/hi'
@@ -70,6 +71,7 @@ const BoardsScreen = () => {
   // Invite member state
   const [inviteSearch, setInviteSearch] = useState('')
   const [isInviteOpen, setIsInviteOpen] = useState(false)
+  const [invitingBoardId, setInvitingBoardId] = useState(null)
   const [searchResults, setSearchResults] = useState([])
   const [isSearching, setIsSearching] = useState(false)
 
@@ -83,6 +85,10 @@ const BoardsScreen = () => {
   const [discoveryQuery, setDiscoveryQuery] = useState('')
   const [discoveryResults, setDiscoveryResults] = useState([])
   const [isSearchingWorkspaces, setIsSearchingWorkspaces] = useState(false)
+  const [discoveryFilter, setDiscoveryFilter] = useState('')
+
+  // Active chat channel
+  const [activeChatChannel, setActiveChatChannel] = useState(null)
 
   useEffect(() => {
     dispatch(fetchBoards())
@@ -92,13 +98,20 @@ const BoardsScreen = () => {
     if (boardId) {
       dispatch(fetchBoardById(boardId))
     }
+    setActiveChatChannel(null)
   }, [boardId, dispatch])
 
   useEffect(() => {
     if (!boardId) {
-      searchGlobalWorkspaces('')
+      searchGlobalWorkspaces('', '')
     }
   }, [boardId])
+
+  useEffect(() => {
+    if (!boardId) {
+      searchGlobalWorkspaces(discoveryQuery, discoveryFilter)
+    }
+  }, [boardId, discoveryFilter])
 
   useEffect(() => {
     if (!boardId && boards.length > 0) {
@@ -114,7 +127,8 @@ const BoardsScreen = () => {
 
   // Debounced search for invite members
   useEffect(() => {
-    if (!inviteSearch.trim()) {
+    const activeId = boardId || invitingBoardId
+    if (!inviteSearch.trim() || !activeId) {
       setSearchResults([])
       return
     }
@@ -122,7 +136,7 @@ const BoardsScreen = () => {
     setIsSearching(true)
     const delayDebounce = setTimeout(async () => {
       try {
-        const response = await axiosInstance.get(`/user/search?q=${encodeURIComponent(inviteSearch)}&boardId=${boardId}`)
+        const response = await axiosInstance.get(`/user/search?q=${encodeURIComponent(inviteSearch)}&boardId=${activeId}`)
         setSearchResults(response.data.users || [])
       } catch (err) {
         console.error('User search error:', err)
@@ -132,7 +146,7 @@ const BoardsScreen = () => {
     }, 500)
 
     return () => clearTimeout(delayDebounce)
-  }, [inviteSearch, boardId])
+  }, [inviteSearch, boardId, invitingBoardId])
 
   // Live member updates (added & removed)
   useEffect(() => {
@@ -185,10 +199,12 @@ const BoardsScreen = () => {
     }
   }
 
-  const searchGlobalWorkspaces = async (query = '') => {
+  const searchGlobalWorkspaces = async (query = '', filter = '') => {
     setIsSearchingWorkspaces(true);
     try {
-      const response = await axiosInstance.get(`/workspaces/search?q=${query}`);
+      const response = await axiosInstance.get(`/workspaces/search`, {
+        params: { q: query, filter: filter }
+      });
       setDiscoveryResults(response.data.workspaces || []);
     } catch (err) {
       console.error('Failed to discover workspaces:', err);
@@ -202,7 +218,7 @@ const BoardsScreen = () => {
       await axiosInstance.post(`/workspaces/${targetBoardId}/join`);
       alert('Joined workspace successfully!');
       dispatch(fetchBoards());
-      searchGlobalWorkspaces(discoveryQuery);
+      searchGlobalWorkspaces(discoveryQuery, discoveryFilter);
     } catch (err) {
       console.error('Failed to join public workspace:', err);
       alert(err.response?.data?.message || 'Failed to join workspace');
@@ -213,7 +229,7 @@ const BoardsScreen = () => {
     try {
       await axiosInstance.post(`/workspaces/${targetBoardId}/request-access`);
       alert('Access request sent successfully!');
-      searchGlobalWorkspaces(discoveryQuery);
+      searchGlobalWorkspaces(discoveryQuery, discoveryFilter);
     } catch (err) {
       console.error('Failed to request workspace access:', err);
       alert(err.response?.data?.message || 'Failed to request access');
@@ -222,8 +238,10 @@ const BoardsScreen = () => {
 
   const handleInvite = async (userToAddId) => {
     try {
-      await dispatch(addBoardMember({ boardId, memberId: userToAddId }))
+      const activeId = boardId || invitingBoardId
+      await dispatch(addBoardMember({ boardId: activeId, memberId: userToAddId }))
       setIsInviteOpen(false)
+      setInvitingBoardId(null)
       setInviteSearch('')
     } catch (err) {
       console.error('Invite member failed', err)
@@ -308,9 +326,24 @@ const BoardsScreen = () => {
                 className="group relative flex flex-col justify-between rounded-2xl border border-white/10 bg-slate-900/20 p-5 hover:border-slate-700/60 hover:bg-slate-900/30 cursor-pointer shadow-md transition hover:-translate-y-0.5"
               >
                 <div>
-                  <div className="flex items-center gap-2 text-slate-400 mb-3">
-                    <HiOutlineFolder className="h-5 w-5 text-sky-500" />
-                    <span className="text-[10px] uppercase tracking-wider font-semibold">Workspace</span>
+                  <div className="flex items-center justify-between text-slate-400 mb-3">
+                    <div className="flex items-center gap-2">
+                      <HiOutlineFolder className="h-5 w-5 text-sky-500" />
+                      <span className="text-[10px] uppercase tracking-wider font-semibold">Workspace</span>
+                    </div>
+                    {(board.createdBy === currentUserId || board.createdBy?._id === currentUserId) && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setInvitingBoardId(board._id);
+                          setIsInviteOpen(true);
+                        }}
+                        className="rounded bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 p-1 transition relative z-30"
+                        title="Invite Member"
+                      >
+                        <HiOutlineUserAdd className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
                   <h3 className="text-sm font-semibold text-white group-hover:text-sky-400 transition truncate">{board.title}</h3>
                   <p className="mt-1 text-[11px] text-slate-400 line-clamp-2 leading-relaxed min-h-[32px]">{board.description || 'No description provided.'}</p>
@@ -358,22 +391,33 @@ const BoardsScreen = () => {
               <p className="text-[11px] text-slate-500">Search and join other public or private workspaces on the platform.</p>
             </div>
             
-            {/* Search Input Bar */}
-            <div className="flex gap-2 w-full md:w-80">
+            {/* Search Input Bar & Filter */}
+            <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
               <input
                 value={discoveryQuery}
                 onChange={(e) => setDiscoveryQuery(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
-                    searchGlobalWorkspaces(discoveryQuery);
+                    searchGlobalWorkspaces(discoveryQuery, discoveryFilter);
                   }
                 }}
                 placeholder="Search workspaces by name..."
-                className="flex-1 rounded-xl border border-white/10 bg-slate-900 px-3.5 py-2 text-xs text-white outline-none focus:border-sky-500 transition"
+                className="rounded-xl border border-white/10 bg-slate-900 px-3.5 py-2 text-xs text-white outline-none focus:border-sky-500 transition w-full sm:w-60"
               />
+              <select
+                value={discoveryFilter}
+                onChange={(e) => setDiscoveryFilter(e.target.value)}
+                className="rounded-xl border border-white/10 bg-slate-900 px-3.5 py-2 text-xs text-white outline-none focus:border-sky-500 transition cursor-pointer"
+              >
+                <option value="">All Workspaces</option>
+                <option value="public">Public</option>
+                <option value="private">Private</option>
+                <option value="joined">Joined</option>
+                <option value="owned">Owned</option>
+              </select>
               <button
-                onClick={() => searchGlobalWorkspaces(discoveryQuery)}
-                className="rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 px-4 py-2 text-xs font-bold transition flex items-center justify-center"
+                onClick={() => searchGlobalWorkspaces(discoveryQuery, discoveryFilter)}
+                className="rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 px-4 py-2 text-xs font-bold transition flex items-center justify-center cursor-pointer"
               >
                 Search
               </button>
@@ -538,83 +582,7 @@ const BoardsScreen = () => {
                 {currentBoard?.members?.length || 0} joined
               </span>
 
-              {/* Add Member Dropdown Trigger */}
-              {isOwner && (
-                <div className="relative">
-                  <button
-                    onClick={() => setIsInviteOpen(!isInviteOpen)}
-                    className="rounded bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 p-1 transition"
-                    title="Invite Teammate"
-                  >
-                    <HiOutlineUserAdd className="h-3.5 w-3.5" />
-                  </button>
-
-                  {/* Invite Dropdown Panel */}
-                  {isInviteOpen && (
-                    <div className="absolute right-0 mt-2 z-50 w-72 rounded-xl border border-white/10 bg-slate-900 p-3 shadow-2xl space-y-2">
-                      <p className="text-[10px] font-semibold text-white">Search User</p>
-                      <input
-                        value={inviteSearch}
-                        onChange={(e) => setInviteSearch(e.target.value)}
-                        placeholder="Search by name or email..."
-                        className="w-full rounded-lg border border-white/5 bg-slate-950 px-2 py-1.5 text-[10px] text-white placeholder-slate-500 outline-none focus:border-sky-500"
-                      />
-                      <div className="max-h-56 overflow-y-auto space-y-1.5 custom-scrollbar">
-                        {isSearching ? (
-                          <p className="text-[9px] text-slate-400 text-center py-2">Searching...</p>
-                        ) : searchResults.length > 0 ? (
-                          searchResults.map((u) => (
-                            <div 
-                              key={u._id}
-                              className="flex flex-col gap-1 p-2 bg-slate-950/40 rounded-lg border border-white/5"
-                            >
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <p className="text-[11px] font-bold text-white leading-tight">{u.name}</p>
-                                  <p className="text-[10px] text-slate-400">{u.email}</p>
-                                  {u.role && (
-                                    <span className="text-[8px] uppercase font-bold text-sky-400 bg-sky-500/10 px-1 py-0.2 rounded mt-0.5 inline-block">
-                                      {u.role}
-                                    </span>
-                                  )}
-                                </div>
-                                <div>
-                                  {u.inviteStatus === 'member' ? (
-                                    <button
-                                      disabled
-                                      className="px-2 py-1 bg-white/5 border border-white/5 rounded text-[10px] text-slate-500 font-semibold cursor-not-allowed"
-                                    >
-                                      Already Added
-                                    </button>
-                                  ) : u.inviteStatus === 'pending' ? (
-                                    <button
-                                      disabled
-                                      className="px-2 py-1 bg-white/5 border border-white/5 rounded text-[10px] text-amber-500/50 font-semibold cursor-not-allowed"
-                                    >
-                                      Invitation Pending
-                                    </button>
-                                  ) : (
-                                    <button
-                                      onClick={() => handleInvite(u._id)}
-                                      className="px-2 py-1 bg-sky-500 hover:bg-sky-400 rounded text-[10px] text-white font-bold transition cursor-pointer"
-                                    >
-                                      Invite
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          ))
-                        ) : inviteSearch.trim() ? (
-                          <p className="text-[9px] text-slate-500 text-center py-2">No users found.</p>
-                        ) : (
-                          <p className="text-[9px] text-slate-500 text-center py-2">Type to search registered users.</p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* Invite teammate button removed from header to keep invite directory as single source of truth */}
             </div>
 
             {/* Owner Dashboard Toggle */}
@@ -758,9 +726,25 @@ const BoardsScreen = () => {
       {isActivityOpen && (
         <aside className="w-full xl:w-76 flex-shrink-0 flex flex-col h-full bg-slate-950 border-l border-white/10 overflow-hidden rounded-2xl xl:rounded-none">
           <div className="flex-1 overflow-hidden">
-            <WorkspaceSidePanel boardId={boardId} currentBoard={currentBoard} onlineUsers={onlineUsers} />
+            <WorkspaceSidePanel
+              boardId={boardId}
+              currentBoard={currentBoard}
+              onlineUsers={onlineUsers}
+              onSelectTextChannel={(ch) => setActiveChatChannel(ch)}
+              activeChatChannel={activeChatChannel}
+            />
           </div>
         </aside>
+      )}
+
+      {/* Sliding Discord-style Chat Drawer */}
+      {activeChatChannel && (
+        <ChatDrawer
+          boardId={boardId}
+          channel={activeChatChannel}
+          currentBoard={currentBoard}
+          onClose={() => setActiveChatChannel(null)}
+        />
       )}
 
       {/* Task Details Right-Side Slide-Over Drawer */}
@@ -770,6 +754,84 @@ const BoardsScreen = () => {
         isOpen={Boolean(taskId)}
         onClose={() => navigate(`/boards/${boardId}`)}
       />
+
+      {/* Invite Member Central Modal */}
+      {isInviteOpen && invitingBoardId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl relative">
+            <button
+              onClick={() => {
+                setIsInviteOpen(false);
+                setInvitingBoardId(null);
+                setInviteSearch('');
+              }}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white"
+            >
+              ✕
+            </button>
+            <h3 className="text-base font-semibold text-white mb-2">Invite Members to Workspace</h3>
+            <p className="text-[11px] text-slate-400 mb-4">Search registered users to invite them to this board.</p>
+            
+            <input
+              value={inviteSearch}
+              onChange={(e) => setInviteSearch(e.target.value)}
+              placeholder="Search by name, username or email..."
+              className="w-full rounded-xl border border-white/10 bg-slate-950 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 outline-none focus:border-sky-500 transition mb-4"
+            />
+            <div className="max-h-56 overflow-y-auto space-y-1.5 custom-scrollbar">
+              {isSearching ? (
+                <p className="text-[10px] text-slate-400 text-center py-4">Searching...</p>
+              ) : searchResults.length > 0 ? (
+                searchResults.map((u) => (
+                  <div 
+                    key={u._id}
+                    className="flex justify-between items-center p-3 bg-slate-950/40 rounded-xl border border-white/5 text-xs gap-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={u.avatar}
+                        alt={u.name}
+                        className="w-9 h-9 rounded-xl border border-white/10"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(u.name)}`;
+                        }}
+                      />
+                      <div>
+                        <p className="font-bold text-white">{u.name}</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">{u.email}</p>
+                        {u.role && (
+                          <span className="text-[8px] uppercase font-bold text-sky-400 bg-sky-500/10 px-1.5 py-0.2 rounded mt-1 inline-block">
+                            {u.role}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      {u.inviteStatus === 'member' ? (
+                        <span className="text-[10px] text-slate-500 font-semibold">Already Added</span>
+                      ) : u.inviteStatus === 'pending' ? (
+                        <span className="text-[10px] text-amber-500/55 font-semibold">Pending</span>
+                      ) : (
+                        <button
+                          onClick={() => handleInvite(u._id)}
+                          className="px-3 py-1.5 bg-sky-500 hover:bg-sky-400 rounded-xl text-[10px] text-white font-bold transition cursor-pointer"
+                        >
+                          Invite
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : inviteSearch.trim() ? (
+                <p className="text-[10px] text-slate-500 text-center py-4">No users found.</p>
+              ) : (
+                <p className="text-[10px] text-slate-500 text-center py-4">Type to search registered users.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )

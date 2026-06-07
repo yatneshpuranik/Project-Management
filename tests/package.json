@@ -1,0 +1,9 @@
+{
+  "name": "tests",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "mongoose": "^9.6.3"
+  }
+}

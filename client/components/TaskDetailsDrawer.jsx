@@ -10,10 +10,11 @@ import {
   HiOutlineChatAlt,
   HiOutlineClipboardList,
   HiOutlineUsers,
-  HiOutlineShieldCheck
+  HiOutlineShieldCheck,
+  HiOutlinePencil
 } from 'react-icons/hi';
 import axiosInstance from '../utils/axiosInstance';
-import { updateTask, deleteTask, joinTask, leaveTask } from '../redux/taskSlice';
+import { updateTask, deleteTask, joinTask, leaveTask, fetchTasksByBoard } from '../redux/taskSlice';
 import socket from '../utils/socket';
 import { toast } from '../utils/toast';
 
@@ -32,6 +33,10 @@ const TaskDetailsDrawer = ({ taskId, boardId, isOpen, onClose }) => {
   const [commentText, setCommentText] = useState('');
   const [comments, setComments] = useState([]);
   const [activities, setActivities] = useState([]);
+
+  // Comment edit state
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
 
   // Form State
   const [title, setTitle] = useState('');
@@ -157,14 +162,36 @@ const TaskDetailsDrawer = ({ taskId, boardId, isOpen, onClose }) => {
       }
     };
 
+    const onCommentUpdated = (data) => {
+      if (data.taskId === taskId) {
+        setComments((prev) =>
+          prev.map((c) => (c._id === data.comment._id ? data.comment : c))
+        );
+      }
+    };
+
+    const onCommentDeleted = (data) => {
+      if (data.taskId === taskId) {
+        setComments((prev) => prev.filter((c) => c._id !== data.commentId));
+      }
+    };
+
     socket.on('comment-added', onCommentAdded);
     socket.on('commentAdded', onCommentAdded);
+    socket.on('comment-updated', onCommentUpdated);
+    socket.on('commentUpdated', onCommentUpdated);
+    socket.on('comment-deleted', onCommentDeleted);
+    socket.on('commentDeleted', onCommentDeleted);
     socket.on('task-updated', onTaskUpdated);
     socket.on('activity-created', onActivityCreated);
 
     return () => {
       socket.off('comment-added', onCommentAdded);
       socket.off('commentAdded', onCommentAdded);
+      socket.off('comment-updated', onCommentUpdated);
+      socket.off('commentUpdated', onCommentUpdated);
+      socket.off('comment-deleted', onCommentDeleted);
+      socket.off('commentDeleted', onCommentDeleted);
       socket.off('task-updated', onTaskUpdated);
       socket.off('activity-created', onActivityCreated);
     };
@@ -377,6 +404,76 @@ const TaskDetailsDrawer = ({ taskId, boardId, isOpen, onClose }) => {
     }
   };
 
+  const handleClaimTask = async () => {
+    try {
+      const response = await axiosInstance.post(`/tasks/${taskId}/claim`);
+      toast.success('Task claimed successfully!');
+      const updatedTask = response.data.task;
+      setTask(updatedTask);
+      setAssignedTo(updatedTask.assignedTo?._id || updatedTask.assignedTo || '');
+      dispatch(fetchTasksByBoard(boardId));
+      socket.emit('task-updated', { boardId, task: updatedTask });
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to claim task');
+    }
+  };
+
+  const handleReleaseTask = async () => {
+    try {
+      const response = await axiosInstance.post(`/tasks/${taskId}/release`);
+      toast.success('Task released.');
+      const updatedTask = response.data.task;
+      setTask(updatedTask);
+      setAssignedTo('');
+      dispatch(fetchTasksByBoard(boardId));
+      socket.emit('task-updated', { boardId, task: updatedTask });
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to release task');
+    }
+  };
+
+  const handleTakeOwnership = async () => {
+    try {
+      const response = await axiosInstance.post(`/tasks/${taskId}/take-ownership`);
+      toast.success('You have taken ownership of this task!');
+      const updatedTask = response.data.task;
+      setTask(updatedTask);
+      setAssignedTo(updatedTask.assignedTo?._id || updatedTask.assignedTo || '');
+      dispatch(fetchTasksByBoard(boardId));
+      socket.emit('task-updated', { boardId, task: updatedTask });
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to take ownership');
+    }
+  };
+
+  const handleEditComment = async (commentId) => {
+    if (!editingCommentText.trim()) return;
+    try {
+      const response = await axiosInstance.put(`/tasks/${taskId}/comments/${commentId}`, {
+        text: editingCommentText.trim()
+      });
+      setComments((prev) => prev.map((c) => c._id === commentId ? response.data.comment : c));
+      setEditingCommentId(null);
+      setEditingCommentText('');
+      socket.emit('comment-updated', { boardId, taskId, comment: response.data.comment });
+      toast.success('Comment updated');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to edit comment');
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm('Delete this comment permanently?')) return;
+    try {
+      await axiosInstance.delete(`/tasks/${taskId}/comments/${commentId}`);
+      setComments((prev) => prev.filter((c) => c._id !== commentId));
+      socket.emit('comment-deleted', { boardId, taskId, commentId });
+      toast.success('Comment deleted');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete comment');
+    }
+  };
+
   const getAssignedName = () => {
     const matched = boardMembers.find(m => (m._id || m) === assignedTo);
     return matched ? matched.name : 'Unassigned';
@@ -559,6 +656,43 @@ const TaskDetailsDrawer = ({ taskId, boardId, isOpen, onClose }) => {
                     <label htmlFor="openContributionCheckbox" className="text-xs text-slate-300 font-semibold cursor-pointer">
                       Enable Open Contribution Mode (workspace members can join)
                     </label>
+                  </div>
+                )}
+
+                {/* Open Contribution Actions Panel */}
+                {task?.openContribution && (
+                  <div className="bg-cyan-500/5 border border-cyan-500/20 p-4 rounded-xl space-y-2">
+                    <p className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider">Open Contributor Actions</p>
+                    <p className="text-slate-400 text-[10.5px]">This task is open for contributions. Members can claim, release, or take ownership of this task.</p>
+                    <div className="flex gap-2 mt-1">
+                      {!assignedTo && (
+                        <button
+                          type="button"
+                          onClick={handleClaimTask}
+                          className="flex-1 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold rounded-xl transition"
+                        >
+                          Claim Task
+                        </button>
+                      )}
+                      {assignedTo && assignedTo !== currentUserId && (
+                        <button
+                          type="button"
+                          onClick={handleTakeOwnership}
+                          className="flex-1 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl transition"
+                        >
+                          Take Ownership
+                        </button>
+                      )}
+                      {assignedTo === currentUserId && (
+                        <button
+                          type="button"
+                          onClick={handleReleaseTask}
+                          className="flex-1 py-2 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 text-xs font-bold rounded-xl transition"
+                        >
+                          Release Task
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -837,15 +971,77 @@ const TaskDetailsDrawer = ({ taskId, boardId, isOpen, onClose }) => {
 
                 <div className="space-y-3.5 max-h-56 overflow-y-auto custom-scrollbar pr-2">
                   {comments.length > 0 ? (
-                    comments.map((comment) => (
-                      <div key={comment._id} className="bg-slate-900 border border-white/5 p-3 rounded-xl text-xs leading-normal">
-                        <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1.5 font-semibold">
-                          <span className="text-slate-300">{comment.userName || comment.user?.name || 'Teammate'}</span>
-                          <span>{new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    comments.map((comment) => {
+                      const isCommentOwner = (comment.userId?._id || comment.userId || '').toString() === currentUserId;
+                      const canDeleteComment = isCommentOwner || isOwner;
+                      const isEditingThisComment = editingCommentId === comment._id;
+
+                      return (
+                        <div key={comment._id} className="bg-slate-900 border border-white/5 p-3 rounded-xl text-xs leading-normal">
+                          <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1.5 font-semibold">
+                            <span className="text-slate-300">{comment.userName || comment.user?.name || 'Teammate'}</span>
+                            <span>{new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                          {isEditingThisComment ? (
+                            <div className="space-y-2 pt-1">
+                              <input
+                                value={editingCommentText}
+                                onChange={(e) => setEditingCommentText(e.target.value)}
+                                className="w-full rounded-lg border border-white/10 bg-slate-950 px-2 py-1.5 text-xs text-white outline-none focus:border-sky-500"
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditComment(comment._id)}
+                                  className="px-2.5 py-1 bg-cyan-500 text-slate-950 rounded font-bold text-[10px]"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingCommentId(null);
+                                    setEditingCommentText('');
+                                  }}
+                                  className="px-2.5 py-1 bg-slate-800 text-slate-400 rounded text-[10px]"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex justify-between items-start gap-2">
+                              <p className="text-slate-200 flex-1 break-words">{comment.text}</p>
+                              <div className="flex items-center gap-1.5 flex-shrink-0">
+                                {isCommentOwner && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingCommentId(comment._id);
+                                      setEditingCommentText(comment.text);
+                                    }}
+                                    className="text-slate-500 hover:text-white transition p-0.5"
+                                    title="Edit Comment"
+                                  >
+                                    <HiOutlinePencil className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                                {canDeleteComment && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteComment(comment._id)}
+                                    className="text-slate-500 hover:text-rose-400 transition p-0.5"
+                                    title="Delete Comment"
+                                  >
+                                    <HiOutlineTrash className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        <p className="text-slate-200">{comment.text}</p>
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
                     <p className="text-[11px] text-slate-500 italic">No comments yet. Post the first comment!</p>
                   )}

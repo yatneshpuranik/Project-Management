@@ -1,7 +1,8 @@
 import Board from '../model/board.js';
 import BoardChatMessage from '../model/boardChatMessage.js';
 import { getIo } from '../socket/socket.js';
-import { encryptUserIds } from '../utils/idCrypt.js';
+import { encryptUserIds, encryptId } from '../utils/idCrypt.js';
+import mongoose from 'mongoose';
 
 const isBoardMember = (board, userId) =>
   board && (board.createdBy.toString() === userId || board.members.some((member) => member.toString() === userId));
@@ -11,6 +12,10 @@ export const getBoardChatMessages = async (req, res) => {
     const { boardId } = req.params;
     const channel = req.query.channel || 'General';
     const userId = req.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(boardId)) {
+      return res.status(400).json({ message: 'Invalid board ID format' });
+    }
 
     const board = await Board.findById(boardId);
     if (!board) {
@@ -47,6 +52,10 @@ export const addBoardChatMessage = async (req, res) => {
     const { channel, content } = req.body;
     const userId = req.userId;
 
+    if (!mongoose.Types.ObjectId.isValid(boardId)) {
+      return res.status(400).json({ message: 'Invalid board ID format' });
+    }
+
     if (!content || !content.trim()) {
       return res.status(400).json({ message: 'Message content is required' });
     }
@@ -71,7 +80,7 @@ export const addBoardChatMessage = async (req, res) => {
     const io = getIo();
     if (io) {
       io.to(`board-${boardId}`).emit('workspaceMessageSent', {
-        boardId: encryptUserIds(boardId),
+        boardId: encryptId(boardId),
         message: encryptUserIds(message),
       });
     }
@@ -90,6 +99,13 @@ export const updateBoardChatMessage = async (req, res) => {
     const { boardId, messageId } = req.params;
     const { content } = req.body;
     const userId = req.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(boardId)) {
+      return res.status(400).json({ message: 'Invalid board ID format' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(messageId)) {
+      return res.status(400).json({ message: 'Invalid message ID format' });
+    }
 
     if (!content || !content.trim()) {
       return res.status(400).json({ message: 'Message content is required' });
@@ -118,7 +134,7 @@ export const updateBoardChatMessage = async (req, res) => {
     const io = getIo();
     if (io) {
       io.to(`board-${boardId}`).emit('workspaceMessageEdited', {
-        boardId: encryptUserIds(boardId),
+        boardId: encryptId(boardId),
         message: encryptUserIds(message),
       });
     }
@@ -136,6 +152,13 @@ export const deleteBoardChatMessage = async (req, res) => {
   try {
     const { boardId, messageId } = req.params;
     const userId = req.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(boardId)) {
+      return res.status(400).json({ message: 'Invalid board ID format' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(messageId)) {
+      return res.status(400).json({ message: 'Invalid message ID format' });
+    }
 
     const board = await Board.findById(boardId);
     if (!board) {
@@ -158,8 +181,8 @@ export const deleteBoardChatMessage = async (req, res) => {
     const io = getIo();
     if (io) {
       io.to(`board-${boardId}`).emit('workspaceMessageDeleted', {
-        boardId: encryptUserIds(boardId),
-        messageId: encryptUserIds(messageId),
+        boardId: encryptId(boardId),
+        messageId: encryptId(messageId),
       });
     }
 
@@ -178,6 +201,10 @@ export const markChatAsRead = async (req, res) => {
     const userId = req.userId;
     const userName = req.userName || 'Unknown';
 
+    if (!mongoose.Types.ObjectId.isValid(boardId)) {
+      return res.status(400).json({ message: 'Invalid board ID format' });
+    }
+
     const board = await Board.findById(boardId);
     if (!board) {
       return res.status(404).json({ message: 'Board not found' });
@@ -194,7 +221,7 @@ export const markChatAsRead = async (req, res) => {
     const io = getIo();
     if (io) {
       io.to(`board-chat-${boardId}`).emit('workspaceMessagesRead', {
-        boardId: encryptUserIds(boardId),
+        boardId: encryptId(boardId),
         userName,
       });
     }

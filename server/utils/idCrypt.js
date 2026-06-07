@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import mongoose from 'mongoose';
 
 const algorithm = 'aes-128-cbc';
 const getKey = () => {
@@ -105,49 +106,93 @@ export const decryptionMiddleware = (req, res, next) => {
 };
 
 /**
- * Helper to recursively encrypt User IDs in outbound payloads.
+ * Helper to recursively encrypt User IDs in outbound payloads without mutating input objects.
  */
 export const encryptUserIds = (data) => {
-  if (!data) return data;
+  if (data === null || data === undefined) {
+    return data;
+  }
+
+  // Handle Mongoose ObjectId or similar ObjectId instances
+  if (data instanceof mongoose.Types.ObjectId || (typeof data === 'object' && data.constructor && data.constructor.name === 'ObjectId')) {
+    return encryptId(data.toString());
+  }
+
+  // Handle Strings
   if (typeof data === 'string') {
-    // Check if it is a 24-character hex ID, if so, encrypt it
     if (data.length === 24 && /^[0-9a-fA-F]{24}$/.test(data)) {
       return encryptId(data);
     }
     return data;
   }
+
+  // Handle Arrays
   if (Array.isArray(data)) {
     return data.map(item => encryptUserIds(item));
   }
+
+  // Handle Dates
+  if (data instanceof Date) {
+    return new Date(data.getTime());
+  }
+
+  // Handle Buffer
+  if (Buffer.isBuffer(data)) {
+    return Buffer.from(data);
+  }
+
+  // Handle Mongoose Document
+  if (typeof data.toObject === 'function') {
+    data = data.toObject({ getters: false, virtuals: false });
+  }
+
+  // Handle generic Objects
   if (typeof data === 'object') {
-    // If it's a mongoose document, convert to object
-    const obj = typeof data.toObject === 'function' ? data.toObject() : data;
+    const clone = {};
     
-    // Check if it's a User object or contains User references
-    if (obj._id) {
-      obj._id = encryptId(obj._id);
-    }
-    if (obj.id) {
-      obj.id = encryptId(obj.id);
-    }
-    
-    // Recursively process keys
-    for (const key in obj) {
-      if (Object.prototype.hasOwnProperty.call(obj, key)) {
-        if (key.endsWith('Id')) {
-          obj[key] = encryptId(obj[key]);
+    // Copy/Clone properties
+    for (const key in data) {
+      if (Object.prototype.hasOwnProperty.call(data, key)) {
+        let val = data[key];
+
+        // Perform encryption on keys and values
+        if (key === '_id' || key === 'id') {
+          if (val) {
+            clone[key] = encryptId(val.toString());
+          } else {
+            clone[key] = val;
+          }
+        } else if (key.endsWith('Id')) {
+          if (val) {
+            clone[key] = encryptId(val.toString());
+          } else {
+            clone[key] = val;
+          }
         } else if (['createdBy', 'assignedTo', 'recipient', 'sender', 'members', 'collaborators', 'replyTo', 'mentions'].includes(key)) {
-          obj[key] = encryptUserIds(obj[key]);
+          clone[key] = encryptUserIds(val);
         } else if (key === 'comments' || key === 'messages') {
-          obj[key] = obj[key].map(c => {
-            if (c.userId) c.userId = encryptUserIds(c.userId);
-            if (c.senderId) c.senderId = encryptUserIds(c.senderId);
-            return c;
-          });
+          if (Array.isArray(val)) {
+            clone[key] = val.map(c => {
+              if (c && typeof c === 'object') {
+                const commentClone = typeof c.toObject === 'function' ? c.toObject({ getters: false, virtuals: false }) : { ...c };
+                if (commentClone.userId) commentClone.userId = encryptUserIds(commentClone.userId);
+                if (commentClone.senderId) commentClone.senderId = encryptUserIds(commentClone.senderId);
+                if (commentClone._id) commentClone._id = encryptId(commentClone._id.toString());
+                if (commentClone.id) commentClone.id = encryptId(commentClone.id.toString());
+                return commentClone;
+              }
+              return c;
+            });
+          } else {
+            clone[key] = val;
+          }
+        } else {
+          clone[key] = encryptUserIds(val);
         }
       }
     }
-    return obj;
+    return clone;
   }
+
   return data;
 };

@@ -8,8 +8,11 @@ import { createActivity } from './activityController.js';
 import { getIo, emitToUser } from '../socket/socket.js';
 import { encryptUserIds, encryptId } from '../utils/idCrypt.js';
 
-const isBoardMember = (board, userId) =>
-  board && (board.createdBy.toString() === userId || board.members.some((member) => member.toString() === userId));
+const isBoardMember = (board, userId) => {
+  if (!board) return false;
+  const ownerId = (board.createdBy?._id || board.createdBy || '').toString();
+  return ownerId === userId || board.members.some((member) => (member?._id || member || '').toString() === userId);
+};
 
 const ensureTaskBoardMembership = async (task, userId) => {
   if (!task) return false;
@@ -41,8 +44,8 @@ export const createTask = async (req, res) => {
     if (assignedTo) {
       const assigneeId = assignedTo.toString();
       const isValidAssignee =
-        board.createdBy.toString() === assigneeId ||
-        board.members.some((member) => member.toString() === assigneeId);
+        (board.createdBy?._id || board.createdBy || '').toString() === assigneeId ||
+        board.members.some((member) => (member?._id || member || '').toString() === assigneeId);
       if (!isValidAssignee) {
         return res.status(400).json({ message: 'Assigned user must be a board member' });
       }
@@ -144,14 +147,18 @@ export const getTasksByBoard = async (req, res) => {
     const { boardId } = req.params;
     const userId = req.userId;
 
+    if (!mongoose.Types.ObjectId.isValid(boardId)) {
+      return res.status(400).json({ message: 'Invalid board ID format' });
+    }
+
     const board = await Board.findById(boardId);
     if (!board) {
       return res.status(404).json({ message: 'Board not found' });
     }
 
     const isMember =
-      board.createdBy.toString() === userId ||
-      board.members.some((member) => member.toString() === userId);
+      (board.createdBy?._id || board.createdBy || '').toString() === userId ||
+      board.members.some((member) => (member?._id || member || '').toString() === userId);
 
     if (!isMember) {
       return res.status(403).json({ message: 'Unauthorized access' });
@@ -178,6 +185,10 @@ export const getTaskById = async (req, res) => {
     const { taskId } = req.params;
     const userId = req.userId;
 
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ message: 'Invalid task ID format' });
+    }
+
     const task = await Task.findById(taskId)
       .populate('assignedTo', 'name email avatar')
       .populate('createdBy', 'name email avatar')
@@ -189,8 +200,8 @@ export const getTaskById = async (req, res) => {
 
     const board = await Board.findById(task.boardId);
     const isMember =
-      board.createdBy.toString() === userId ||
-      board.members.some((member) => member.toString() === userId);
+      (board.createdBy?._id || board.createdBy || '').toString() === userId ||
+      board.members.some((member) => (member?._id || member || '').toString() === userId);
 
     if (!isMember) {
       return res.status(403).json({ message: 'Unauthorized access' });
@@ -212,14 +223,18 @@ export const updateTask = async (req, res) => {
     const userId = req.userId;
     const updates = req.body;
 
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ message: 'Invalid task ID format' });
+    }
+
     const task = await Task.findById(taskId);
     if (!task) {
       return res.status(404).json({ message: 'Task not found' });
     }
 
     const board = await Board.findById(task.boardId);
-    const isOwner = board.createdBy.toString() === userId;
-    const isMember = isOwner || board.members.some((member) => member.toString() === userId);
+    const isOwner = (board.createdBy?._id || board.createdBy || '').toString() === userId;
+    const isMember = isOwner || board.members.some((member) => (member?._id || member || '').toString() === userId);
 
     if (!isMember) {
       return res.status(403).json({ message: 'Unauthorized access' });
@@ -375,6 +390,10 @@ export const moveTask = async (req, res) => {
     const { status, position } = req.body;
     const userId = req.userId;
 
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ message: 'Invalid task ID format' });
+    }
+
     const task = await Task.findById(taskId);
     if (!task) {
       return res.status(404).json({ message: 'Task not found' });
@@ -382,8 +401,8 @@ export const moveTask = async (req, res) => {
 
     const board = await Board.findById(task.boardId);
     const isMember =
-      board.createdBy.toString() === userId ||
-      board.members.some((member) => member.toString() === userId);
+      (board.createdBy?._id || board.createdBy || '').toString() === userId ||
+      board.members.some((member) => (member?._id || member || '').toString() === userId);
 
     if (!isMember) {
       return res.status(403).json({ message: 'Unauthorized access' });
@@ -423,6 +442,10 @@ export const deleteTask = async (req, res) => {
     const { taskId } = req.params;
     const userId = req.userId;
 
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ message: 'Invalid task ID format' });
+    }
+
     const task = await Task.findById(taskId);
     if (!task) {
       return res.status(404).json({ message: 'Task not found' });
@@ -430,7 +453,7 @@ export const deleteTask = async (req, res) => {
 
     const board = await Board.findById(task.boardId);
     // Permission Check: Only Board Owner can delete task
-    const isOwner = board.createdBy.toString() === userId;
+    const isOwner = (board.createdBy?._id || board.createdBy || '').toString() === userId;
     if (!isOwner) {
       return res.status(403).json({ message: 'Only the board owner can delete tasks' });
     }
@@ -466,13 +489,20 @@ export const inviteToTask = async (req, res) => {
     const { memberId } = req.body;
     const userId = req.userId;
 
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ message: 'Invalid task ID format' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(memberId)) {
+      return res.status(400).json({ message: 'Invalid member ID format' });
+    }
+
     const task = await Task.findById(taskId);
     if (!task) {
       return res.status(404).json({ message: 'Task not found' });
     }
 
     const board = await Board.findById(task.boardId);
-    const isOwner = board.createdBy.toString() === userId;
+    const isOwner = (board.createdBy?._id || board.createdBy || '').toString() === userId;
     if (!isOwner) {
       return res.status(403).json({ message: 'Only the board owner can invite task collaborators' });
     }
@@ -537,6 +567,9 @@ export const inviteToTask = async (req, res) => {
 export const getComments = async (req, res) => {
   try {
     const { taskId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ message: 'Invalid task ID format' });
+    }
     const task = await Task.findById(taskId).populate('comments.userId', 'name email avatar');
     if (!task) {
       return res.status(404).json({ message: 'Task not found' });
@@ -561,6 +594,10 @@ export const addComment = async (req, res) => {
     const { text } = req.body;
     const userId = req.userId;
 
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ message: 'Invalid task ID format' });
+    }
+
     if (!text || !text.trim()) {
       return res.status(400).json({ message: 'Comment text is required' });
     }
@@ -570,7 +607,7 @@ export const addComment = async (req, res) => {
       return res.status(404).json({ message: 'Task not found' });
     }
     const board = await Board.findById(task.boardId);
-    if (!isBoardMember(board, userId)) {
+    if (!board || !isBoardMember(board, userId)) {
       return res.status(403).json({ message: 'Unauthorized access' });
     }
 
@@ -597,6 +634,74 @@ export const addComment = async (req, res) => {
       message: `${req.userName || 'Member'} commented on task "${task.title}": "${text.trim()}"`,
     });
 
+    // Notify assignee if not the commenter
+    if (task.assignedTo && task.assignedTo.toString() !== userId) {
+      const notif = new Notification({
+        recipient: task.assignedTo,
+        sender: userId,
+        senderName: req.userName || 'Member',
+        type: 'comment',
+        status: 'unread',
+        boardId: task.boardId,
+        boardTitle: board.title,
+        taskId: task._id,
+        taskTitle: task.title,
+        message: `${req.userName || 'Member'} commented on task "${task.title}": "${text.trim().substring(0, 50)}${text.trim().length > 50 ? '...' : ''}"`,
+      });
+      await notif.save();
+      try {
+        emitToUser(task.assignedTo, 'invitationSent', {
+          recipientId: encryptId(task.assignedTo),
+          notification: encryptUserIds(notif)
+        });
+      } catch (err) {}
+    }
+
+    // Parse mentions
+    const mentionRegex = /@(\w+)/g;
+    let match;
+    const mentionedNames = new Set();
+    while ((match = mentionRegex.exec(text)) !== null) {
+      mentionedNames.add(match[1]);
+    }
+
+    for (const name of mentionedNames) {
+      const mentionedUser = await User.findOne({
+        name: { $regex: new RegExp(`^${name}$`, 'i') }
+      });
+      if (mentionedUser && isBoardMember(board, mentionedUser._id.toString()) && mentionedUser._id.toString() !== userId && (!task.assignedTo || task.assignedTo.toString() !== mentionedUser._id.toString())) {
+        const mentionNotif = new Notification({
+          recipient: mentionedUser._id,
+          sender: userId,
+          senderName: req.userName || 'Member',
+          type: 'mention',
+          status: 'unread',
+          boardId: task.boardId,
+          boardTitle: board.title,
+          taskId: task._id,
+          taskTitle: task.title,
+          message: `${req.userName || 'Member'} mentioned you in task "${task.title}": "${text.trim().substring(0, 50)}${text.trim().length > 50 ? '...' : ''}"`,
+        });
+        await mentionNotif.save();
+        try {
+          emitToUser(mentionedUser._id, 'invitationSent', {
+            recipientId: encryptId(mentionedUser._id),
+            notification: encryptUserIds(mentionNotif)
+          });
+        } catch (err) {}
+      }
+    }
+
+    try {
+      const io = getIo();
+      if (io) {
+        io.to(`board-${task.boardId}`).emit('comment-added', {
+          taskId: encryptId(task._id),
+          comment: encryptUserIds(comment),
+        });
+      }
+    } catch (err) {}
+
     res.status(201).json({
       message: 'Comment added successfully',
       comment: encryptUserIds(comment),
@@ -613,6 +718,13 @@ export const updateComment = async (req, res) => {
     const { text } = req.body;
     const userId = req.userId;
 
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ message: 'Invalid task ID format' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(commentId)) {
+      return res.status(400).json({ message: 'Invalid comment ID format' });
+    }
+
     if (!text || !text.trim()) {
       return res.status(400).json({ message: 'Comment text is required' });
     }
@@ -622,7 +734,7 @@ export const updateComment = async (req, res) => {
       return res.status(404).json({ message: 'Task not found' });
     }
     const board = await Board.findById(task.boardId);
-    if (!isBoardMember(board, userId)) {
+    if (!board || !isBoardMember(board, userId)) {
       return res.status(403).json({ message: 'Unauthorized access' });
     }
 
@@ -638,9 +750,22 @@ export const updateComment = async (req, res) => {
     comment.text = text.trim();
     await task.save();
 
+    const savedTask = await Task.findById(taskId).populate('comments.userId', 'name email avatar');
+    const updatedComment = savedTask.comments.id(commentId);
+
+    try {
+      const io = getIo();
+      if (io) {
+        io.to(`board-${task.boardId}`).emit('comment-updated', {
+          taskId: encryptId(task._id),
+          comment: encryptUserIds(updatedComment),
+        });
+      }
+    } catch (err) {}
+
     res.status(200).json({
       message: 'Comment updated successfully',
-      comment: encryptUserIds(comment),
+      comment: encryptUserIds(updatedComment),
     });
   } catch (error) {
     res.status(500).json({ message: 'Error updating comment', error: error.message });
@@ -653,12 +778,19 @@ export const deleteComment = async (req, res) => {
     const { taskId, commentId } = req.params;
     const userId = req.userId;
 
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ message: 'Invalid task ID format' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(commentId)) {
+      return res.status(400).json({ message: 'Invalid comment ID format' });
+    }
+
     const task = await Task.findById(taskId);
     if (!task) {
       return res.status(404).json({ message: 'Task not found' });
     }
     const boardRecord = await Board.findById(task.boardId);
-    if (!isBoardMember(boardRecord, userId)) {
+    if (!boardRecord || !isBoardMember(boardRecord, userId)) {
       return res.status(403).json({ message: 'Unauthorized access' });
     }
 
@@ -667,7 +799,6 @@ export const deleteComment = async (req, res) => {
       return res.status(404).json({ message: 'Comment not found' });
     }
 
-    // Allow deletion if requester is comment owner OR board owner
     const isCommentOwner = comment.userId.toString() === userId;
     const isBoardOwner = boardRecord.createdBy.toString() === userId;
 
@@ -675,8 +806,19 @@ export const deleteComment = async (req, res) => {
       return res.status(403).json({ message: 'Unauthorized comment deletion' });
     }
 
+    const commentIdRaw = comment._id;
     comment.deleteOne();
     await task.save();
+
+    try {
+      const io = getIo();
+      if (io) {
+        io.to(`board-${boardRecord._id}`).emit('comment-deleted', {
+          taskId: encryptId(task._id),
+          commentId: encryptId(commentIdRaw),
+        });
+      }
+    } catch (err) {}
 
     res.status(200).json({
       message: 'Comment deleted successfully',
@@ -692,6 +834,9 @@ export const deleteComment = async (req, res) => {
 export const getChatMessages = async (req, res) => {
   try {
     const { taskId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ message: 'Invalid task ID format' });
+    }
     const task = await Task.findById(taskId);
     if (!task) {
       return res.status(404).json({ message: 'Task not found' });
@@ -720,6 +865,10 @@ export const addChatMessage = async (req, res) => {
     const { taskId } = req.params;
     const { message } = req.body;
     const userId = req.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ message: 'Invalid task ID format' });
+    }
 
     if (!message || !message.trim()) {
       return res.status(400).json({ message: 'Message content is required' });
@@ -784,6 +933,13 @@ export const updateChatMessage = async (req, res) => {
     const { message } = req.body;
     const userId = req.userId;
 
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ message: 'Invalid task ID format' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(messageId)) {
+      return res.status(400).json({ message: 'Invalid message ID format' });
+    }
+
     if (!message || !message.trim()) {
       return res.status(400).json({ message: 'Message content is required' });
     }
@@ -840,6 +996,13 @@ export const deleteChatMessage = async (req, res) => {
     const { taskId, messageId } = req.params;
     const userId = req.userId;
 
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ message: 'Invalid task ID format' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(messageId)) {
+      return res.status(400).json({ message: 'Invalid message ID format' });
+    }
+
     const task = await Task.findById(taskId);
     if (!task) {
       return res.status(404).json({ message: 'Task not found' });
@@ -893,6 +1056,10 @@ export const joinTask = async (req, res) => {
     const { taskId } = req.params;
     const userId = req.userId;
 
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ message: 'Invalid task ID format' });
+    }
+
     const task = await Task.findById(taskId);
     if (!task) {
       return res.status(404).json({ message: 'Task not found' });
@@ -904,8 +1071,8 @@ export const joinTask = async (req, res) => {
     }
 
     const isMember =
-      board.createdBy.toString() === userId ||
-      board.members.some((member) => member.toString() === userId);
+      (board.createdBy?._id || board.createdBy || '').toString() === userId ||
+      board.members.some((member) => (member?._id || member || '').toString() === userId);
 
     if (!isMember) {
       return res.status(403).json({ message: 'Only workspace members can join tasks' });
@@ -960,6 +1127,10 @@ export const leaveTask = async (req, res) => {
     const { taskId } = req.params;
     const userId = req.userId;
 
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ message: 'Invalid task ID format' });
+    }
+
     const task = await Task.findById(taskId);
     if (!task) {
       return res.status(404).json({ message: 'Task not found' });
@@ -1011,6 +1182,10 @@ export const addTaskChecklistItem = async (req, res) => {
     const { text } = req.body;
     const userId = req.userId;
 
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ message: 'Invalid task ID format' });
+    }
+
     if (!text || !text.trim()) {
       return res.status(400).json({ message: 'Checklist item text is required' });
     }
@@ -1059,6 +1234,13 @@ export const updateTaskChecklistItem = async (req, res) => {
     const { taskId, itemId } = req.params;
     const { text, completed } = req.body;
     const userId = req.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ message: 'Invalid task ID format' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(itemId)) {
+      return res.status(400).json({ message: 'Invalid item ID format' });
+    }
 
     const task = await Task.findById(taskId);
     if (!task) {
@@ -1116,6 +1298,13 @@ export const deleteTaskChecklistItem = async (req, res) => {
     const { taskId, itemId } = req.params;
     const userId = req.userId;
 
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ message: 'Invalid task ID format' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(itemId)) {
+      return res.status(400).json({ message: 'Invalid item ID format' });
+    }
+
     const task = await Task.findById(taskId);
     if (!task) {
       return res.status(404).json({ message: 'Task not found' });
@@ -1160,5 +1349,209 @@ export const deleteTaskChecklistItem = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Error deleting checklist item', error: error.message });
+  }
+};
+
+// Claim Task (Open Contributor Mode)
+export const claimTask = async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const userId = req.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ message: 'Invalid task ID format' });
+    }
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    const board = await Board.findById(task.boardId);
+    if (!isBoardMember(board, userId)) {
+      return res.status(403).json({ message: 'Unauthorized workspace access' });
+    }
+
+    if (!task.openContribution) {
+      return res.status(400).json({ message: 'Open contribution mode is disabled for this task' });
+    }
+
+    if (task.assignedTo) {
+      return res.status(400).json({ message: 'Task is already claimed by another member' });
+    }
+
+    task.assignedTo = userId;
+    task.assignedBy = userId;
+    await task.save();
+    await task.populate(['assignedTo', 'createdBy', 'collaborators']);
+
+    await createActivity({
+      boardId: task.boardId,
+      taskId: task._id,
+      userId,
+      userName: req.userName || 'Member',
+      type: 'Task Claimed',
+      message: `${req.userName || 'Member'} claimed the task "${task.title}"`,
+    });
+
+    try {
+      const io = getIo();
+      if (io) {
+        io.to(`board-${task.boardId}`).emit('task-updated', { task: encryptUserIds(task) });
+      }
+    } catch (err) {
+      // Ignore
+    }
+
+    res.status(200).json({
+      message: 'Task claimed successfully',
+      task: encryptUserIds(task)
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error claiming task', error: error.message });
+  }
+};
+
+// Release Task (Open Contributor Mode)
+export const releaseTask = async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const userId = req.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ message: 'Invalid task ID format' });
+    }
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    const board = await Board.findById(task.boardId);
+    if (!isBoardMember(board, userId)) {
+      return res.status(403).json({ message: 'Unauthorized workspace access' });
+    }
+
+    if (!task.openContribution) {
+      return res.status(400).json({ message: 'Open contribution mode is disabled for this task' });
+    }
+
+    if (!task.assignedTo || task.assignedTo.toString() !== userId) {
+      return res.status(400).json({ message: 'You are not assigned to this task' });
+    }
+
+    task.assignedTo = undefined;
+    task.assignedBy = undefined;
+    await task.save();
+    await task.populate(['assignedTo', 'createdBy', 'collaborators']);
+
+    await createActivity({
+      boardId: task.boardId,
+      taskId: task._id,
+      userId,
+      userName: req.userName || 'Member',
+      type: 'Task Released',
+      message: `${req.userName || 'Member'} released their claim on task "${task.title}"`,
+    });
+
+    try {
+      const io = getIo();
+      if (io) {
+        io.to(`board-${task.boardId}`).emit('task-updated', { task: encryptUserIds(task) });
+      }
+    } catch (err) {
+      // Ignore
+    }
+
+    res.status(200).json({
+      message: 'Task released successfully',
+      task: encryptUserIds(task)
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error releasing task', error: error.message });
+  }
+};
+
+// Take Ownership (Open Contributor Mode)
+export const takeOwnership = async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const userId = req.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ message: 'Invalid task ID format' });
+    }
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    const board = await Board.findById(task.boardId);
+    if (!isBoardMember(board, userId)) {
+      return res.status(403).json({ message: 'Unauthorized workspace access' });
+    }
+
+    if (!task.openContribution) {
+      return res.status(400).json({ message: 'Open contribution mode is disabled for this task' });
+    }
+
+    const previousAssignee = task.assignedTo;
+    task.assignedTo = userId;
+    task.assignedBy = userId;
+    await task.save();
+    await task.populate(['assignedTo', 'createdBy', 'collaborators']);
+
+    await createActivity({
+      boardId: task.boardId,
+      taskId: task._id,
+      userId,
+      userName: req.userName || 'Member',
+      type: 'Task Ownership Taken',
+      message: `${req.userName || 'Member'} took over ownership/assignment of task "${task.title}"`,
+    });
+
+    // Notify previous assignee if any
+    if (previousAssignee && previousAssignee.toString() !== userId) {
+      const notification = new Notification({
+        recipient: previousAssignee,
+        sender: userId,
+        senderName: req.userName || 'Member',
+        type: 'task_reassign',
+        status: 'unread',
+        boardId: task.boardId,
+        boardTitle: board.title,
+        taskId: task._id,
+        taskTitle: task.title,
+        message: `${req.userName || 'Member'} took ownership of task: "${task.title}"`,
+      });
+      await notification.save();
+      try {
+        emitToUser(previousAssignee, 'taskUnassigned', {
+          taskId: encryptId(task._id),
+          taskTitle: task.title,
+          message: 'Task assignment removed: taken over by another member',
+          notification: encryptUserIds(notification)
+        });
+      } catch (err) {
+        // Ignore
+      }
+    }
+
+    try {
+      const io = getIo();
+      if (io) {
+        io.to(`board-${task.boardId}`).emit('task-updated', { task: encryptUserIds(task) });
+      }
+    } catch (err) {
+      // Ignore
+    }
+
+    res.status(200).json({
+      message: 'Task ownership taken successfully',
+      task: encryptUserIds(task)
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error taking task ownership', error: error.message });
   }
 };

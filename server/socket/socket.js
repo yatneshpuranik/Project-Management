@@ -5,6 +5,14 @@ import User from '../model/userModel.js';
 import BoardChatMessage from '../model/boardChatMessage.js';
 import Notification from '../model/notification.js';
 import { encryptId, decryptId, encryptUserIds } from '../utils/idCrypt.js';
+import logger from '../utils/logger.js';
+
+const console = {
+  log: (...args) => logger.debug(...args),
+  error: (...args) => logger.error(...args),
+  warn: (...args) => logger.warn(...args),
+  info: (...args) => logger.info(...args)
+};
 
 const activeUsers = new Map(); // Store active users per board (Keys: decrypted boardId)
 const activeTaskUsers = new Map(); // Store active users per task (Keys: decrypted taskId)
@@ -823,7 +831,21 @@ const setupSocket = (io) => {
       const { boardId, channelName } = data;
       const decBoardId = decryptId(boardId);
       const room = `board-voice-${decBoardId}-${channelName}`;
+      
+      // If already in a voice channel, leave it first
+      if (socket.voiceChannel && socket.voiceBoardId) {
+        const oldRoom = `board-voice-${socket.voiceBoardId}-${socket.voiceChannel}`;
+        socket.leave(oldRoom);
+        socket.to(`board-${socket.voiceBoardId}`).emit('userLeftVoice', {
+          userId: encryptId(socket.userId),
+          userName: socket.userName,
+          channelName: socket.voiceChannel
+        });
+      }
+
       socket.join(room);
+      socket.voiceChannel = channelName;
+      socket.voiceBoardId = decBoardId;
       
       socket.to(`board-${decBoardId}`).emit('userJoinedVoice', {
         userId: encryptId(socket.userId),
@@ -838,6 +860,9 @@ const setupSocket = (io) => {
       const decBoardId = decryptId(boardId);
       const room = `board-voice-${decBoardId}-${channelName}`;
       socket.leave(room);
+
+      socket.voiceChannel = undefined;
+      socket.voiceBoardId = undefined;
 
       socket.to(`board-${decBoardId}`).emit('userLeftVoice', {
         userId: encryptId(socket.userId),
@@ -864,6 +889,18 @@ const setupSocket = (io) => {
     // Handle disconnection
     socket.on('disconnect', async () => {
       console.log(`User disconnected: ${socket.id}`);
+
+      // Leave voice channel if in one
+      if (socket.voiceChannel && socket.voiceBoardId) {
+        const room = `board-voice-${socket.voiceBoardId}-${socket.voiceChannel}`;
+        socket.to(`board-${socket.voiceBoardId}`).emit('userLeftVoice', {
+          userId: encryptId(socket.userId),
+          userName: socket.userName,
+          channelName: socket.voiceChannel
+        });
+        socket.voiceChannel = undefined;
+        socket.voiceBoardId = undefined;
+      }
 
       const dUserId = socket.userId;
       if (dUserId) {

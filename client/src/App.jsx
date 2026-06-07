@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { setUser } from '../redux/userSlice.js'
 import axiosInstance from '../utils/axiosInstance'
 import socket, { connectSocket, disconnectSocket } from '../utils/socket'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import ProfileScreen from '../page/ProfileScreen.jsx'
 import LoginScreen from '../page/LoginScreen.jsx'
 import AllUser from '../page/AllUser.jsx'
@@ -23,6 +23,8 @@ const App = () => {
   const { user } = useSelector((state) => state.user)
   const [authChecked, setAuthChecked] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const location = useLocation()
+  const isAdminPath = location.pathname.startsWith('/admin')
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen)
   const closeSidebar = () => setIsSidebarOpen(false)
@@ -81,7 +83,7 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col overflow-hidden">
-      <Navbar toggleSidebar={toggleSidebar} />
+      {!isAdminPath && <Navbar toggleSidebar={toggleSidebar} />}
       {authChecked ? (
         <Routes>
           <Route path='/' element={<Home />} />

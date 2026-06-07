@@ -1,12 +1,22 @@
 import { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { updateBoard, fetchBoardById } from '../redux/boardSlice';
 import axiosInstance from '../utils/axiosInstance';
 import { HiOutlineUserGroup, HiOutlineBell, HiOutlineCog, HiOutlineHashtag, HiOutlinePlus, HiOutlineTrash, HiOutlineLockOpen, HiOutlineLockClosed, HiOutlineUserRemove, HiOutlineShieldCheck } from 'react-icons/hi';
+import { toast } from '../utils/toast';
 
 const SettingsScreen = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { currentBoard } = useSelector((state) => state.boards);
+
+  useEffect(() => {
+    if (!currentBoard?._id) {
+      toast.error('Please select a workspace first.');
+      navigate('/boards');
+    }
+  }, [currentBoard, navigate]);
   const currentUserId = localStorage.getItem('userId');
   const userRole = localStorage.getItem('userRole');
 
@@ -250,43 +260,72 @@ const SettingsScreen = () => {
               <p className="text-[10px] text-slate-400">Manage member privileges globally from this workspace.</p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              {[currentBoard.createdBy, ...currentBoard.members].filter(Boolean).map((member) => {
-                const isSelf = member._id === currentUserId;
-                const isMemberOwner = member.role === 'OWNER';
-                return (
-                  <div key={member._id} className="rounded-xl border border-white/5 bg-slate-950/40 p-3 flex justify-between items-center text-xs">
-                    <div>
-                      <p className="font-semibold text-slate-200">{member.name}</p>
-                      <p className="text-[10px] text-slate-500">{member.email}</p>
-                      <span className={`px-1 rounded text-[9px] font-bold mt-1 inline-block ${isMemberOwner ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20' : 'bg-slate-800 text-slate-500'}`}>
-                        {member.role || 'MEMBER'}
-                      </span>
-                    </div>
-                    {!isSelf && (
-                      <div className="flex gap-1">
-                        {isMemberOwner ? (
-                          <button
-                            type="button"
-                            onClick={() => handleDemoteUser(member._id)}
-                            className="px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition font-bold"
-                          >
-                            Demote
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handlePromoteUser(member._id)}
-                            className="px-2 py-1 bg-sky-500/15 border border-sky-500/25 rounded text-sky-400 hover:bg-sky-500 hover:text-white transition font-bold"
-                          >
-                            Promote
-                          </button>
-                        )}
+            <div className="space-y-4">
+              {/* Owner Section */}
+              <div>
+                <span className="text-[10px] uppercase font-bold text-sky-400 block tracking-wider mb-2">Owner</span>
+                {currentBoard.createdBy && (() => {
+                  const member = currentBoard.createdBy;
+                  return (
+                    <div className="rounded-xl border border-sky-500/20 bg-slate-950/40 p-3 flex justify-between items-center text-xs w-full sm:w-1/2">
+                      <div>
+                        <p className="font-semibold text-slate-200">{member.name}</p>
+                        <p className="text-[10px] text-slate-500">{member.email}</p>
+                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold mt-1 inline-block bg-sky-500/10 text-sky-400 border border-sky-500/20 border-sky-500/20">
+                          OWNER
+                        </span>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Members Section */}
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider mb-2">Members</span>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {(currentBoard.members || [])
+                    .filter(member => {
+                      const mId = (member?._id || member || '').toString();
+                      const creatorId = (currentBoard.createdBy?._id || currentBoard.createdBy || '').toString();
+                      return mId !== creatorId;
+                    })
+                    .map((member) => {
+                      const isSelf = member._id === currentUserId;
+                      return (
+                        <div key={member._id} className="rounded-xl border border-white/5 bg-slate-950/40 p-3 flex justify-between items-center text-xs">
+                          <div>
+                            <p className="font-semibold text-slate-200">{member.name}</p>
+                            <p className="text-[10px] text-slate-500">{member.email}</p>
+                            <span className="px-1.5 py-0.5 rounded text-[8px] font-bold mt-1 inline-block bg-slate-800 text-slate-500">
+                              MEMBER
+                            </span>
+                          </div>
+                          {!isSelf && (
+                            <div className="flex gap-1">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!window.confirm('Are you sure you want to remove this member?')) return;
+                                  try {
+                                    await axiosInstance.delete(`/boards/${currentBoard._id}/members/${member._id}`);
+                                    toast.success('Member removed successfully.');
+                                    dispatch(fetchBoardById(currentBoard._id));
+                                  } catch (err) {
+                                    toast.error(err.response?.data?.message || 'Failed to remove member.');
+                                  }
+                                }}
+                                className="px-2 py-1 bg-rose-500/15 border border-rose-500/25 rounded text-rose-400 hover:bg-rose-500 hover:text-white transition font-bold"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
             </div>
           </section>
         )}

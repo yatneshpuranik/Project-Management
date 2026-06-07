@@ -143,38 +143,38 @@ describe('MERN Kanban SaaS Audit Test Suite', () => {
           },
           tasks: { tasks: [], onlineUsers: [] },
         });
-      });      localStorage.setItem('userId', 'owner123');
+      });
+      localStorage.setItem('userId', 'owner123');
 
       const { container } = render(
-        <MemoryRouter initialEntries={['/boards/board123']}>
+        <MemoryRouter initialEntries={['/boards']}>
           <Routes>
-            <Route path="/boards/:boardId" element={<BoardsScreen />} />
+            <Route path="/boards" element={<BoardsScreen />} />
           </Routes>
         </MemoryRouter>
       );
 
-      // Verify header has z-index class to fix stacking context
-      const header = container.querySelector('header');
-      expect(header).toHaveClass('relative');
-      expect(header).toHaveClass('z-20');
-
       // Dropdown should be initially hidden
-      expect(screen.queryByPlaceholderText('Search by name or email...')).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText('Search by name, username or email...')).not.toBeInTheDocument();
 
-      // Click invite button
-      const inviteBtn = screen.getByTitle('Invite Teammate');
+      // Click invite button on the workspace card
+      const inviteBtn = screen.getByTitle('Invite Member');
       await act(async () => {
         fireEvent.click(inviteBtn);
       });
 
       // Dropdown should be visible
-      expect(screen.getByPlaceholderText('Search by name or email...')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Search by name, username or email...')).toBeInTheDocument();
     });
   });
 
   describe('3. Settings Page', () => {
     it('removed Database & Socket Connection section is not rendered', () => {
-      render(<SettingsScreen />);
+      render(
+        <MemoryRouter>
+          <SettingsScreen />
+        </MemoryRouter>
+      );
       expect(screen.queryByText('Database & Socket Connection')).not.toBeInTheDocument();
       expect(screen.queryByText('Websocket Connected')).not.toBeInTheDocument();
       expect(screen.queryByText(/ws:\/\/localhost/)).not.toBeInTheDocument();
@@ -192,7 +192,11 @@ describe('MERN Kanban SaaS Audit Test Suite', () => {
         });
       });
 
-      render(<AnalyticsScreen />);
+      render(
+        <MemoryRouter>
+          <AnalyticsScreen />
+        </MemoryRouter>
+      );
 
       // Wait for metrics to render
       const completionRate = await screen.findByText('50%');
@@ -241,7 +245,11 @@ describe('MERN Kanban SaaS Audit Test Suite', () => {
         },
       });
 
-      render(<AnalyticsScreen />);
+      render(
+        <MemoryRouter>
+          <AnalyticsScreen />
+        </MemoryRouter>
+      );
 
       const emptyStateText = await screen.findByText('No tasks in this workspace');
       expect(emptyStateText).toBeInTheDocument();

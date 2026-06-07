@@ -100,7 +100,10 @@ const taskSlice = createSlice({
   reducers: {
     // Local actions
     addTaskLocally: (state, action) => {
-      state.tasks.push(action.payload);
+      const exists = state.tasks.some(task => task._id === action.payload._id);
+      if (!exists) {
+        state.tasks.push(action.payload);
+      }
     },
     updateTaskLocally: (state, action) => {
       const index = state.tasks.findIndex(task => task._id === action.payload._id);
@@ -160,7 +163,10 @@ const taskSlice = createSlice({
     });
     builder.addCase(createTask.fulfilled, (state, action) => {
       state.loading = false;
-      state.tasks.push(action.payload);
+      const exists = state.tasks.some(task => task._id === action.payload._id);
+      if (!exists) {
+        state.tasks.push(action.payload);
+      }
     });
     builder.addCase(createTask.rejected, (state, action) => {
       state.loading = false;

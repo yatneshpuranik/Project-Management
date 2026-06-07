@@ -3,6 +3,7 @@ import Notification from '../model/notification.js';
 import Board from '../model/board.js';
 import Task from '../model/task.js';
 import User from '../model/userModel.js';
+import AuditLog from '../model/auditLog.js';
 import { createActivity } from './activityController.js';
 import { encryptUserIds, encryptId } from '../utils/idCrypt.js';
 import { getIo, emitToUser } from '../socket/socket.js';
@@ -31,6 +32,10 @@ export const respondToInvitation = async (req, res) => {
     const { notificationId } = req.params;
     const { action } = req.body; // 'accept' or 'reject'
     const userId = req.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(notificationId)) {
+      return res.status(400).json({ message: 'Invalid notification ID format' });
+    }
 
     if (!['accept', 'reject'].includes(action)) {
       return res.status(400).json({ message: 'Invalid action' });
@@ -61,24 +66,66 @@ export const respondToInvitation = async (req, res) => {
         return res.status(404).json({ message: 'Board not found' });
       }
 
+      // Check if recipient is the board creator -> this means this is an access request!
+      const isAccessRequest = (board.createdBy?._id || board.createdBy || '').toString() === userId;
+      // targetUserId is the user to add to the board (if access request, add the sender of request; else add the current user/invitee)
+      const targetUserId = isAccessRequest ? notification.sender : userId;
+      const targetUser = await User.findById(targetUserId);
+      const targetUserName = targetUser ? targetUser.name : 'A member';
+
       if (action === 'accept') {
-        if (!board.members.includes(userId)) {
-          board.members.push(userId);
-          await board.save();
+        if (!board.members.some(m => m.toString() === targetUserId.toString())) {
+          board.members.push(targetUserId);
         }
+        // Also remove from requests array if it was an access request
+        if (board.requests) {
+          board.requests = board.requests.filter(r => r.toString() !== targetUserId.toString());
+        }
+        await board.save();
+        await board.populate(['createdBy', 'members']);
+
+        await AuditLog.create({
+          action: isAccessRequest ? 'Access Request Approved' : 'Invite Accepted',
+          actorId: userId,
+          actorName: userName,
+          targetId: board._id,
+          targetName: board.title,
+          details: isAccessRequest 
+            ? `${userName} approved access request for ${targetUserName} to join workspace "${board.title}"`
+            : `${userName} accepted invitation to join workspace "${board.title}"`,
+          ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || ''
+        }).catch(e => {});
 
         await createActivity({
           boardId: board._id,
-          userId,
-          userName,
+          userId: targetUserId,
+          userName: targetUserName,
           type: 'Invitation Accepted',
-          message: `${userName} accepted invitation to join workspace "${board.title}"`,
+          message: isAccessRequest
+            ? `${targetUserName} was added to workspace "${board.title}" via access request approval`
+            : `${userName} accepted invitation to join workspace "${board.title}"`,
         });
+
+        // If it was an access request, create approval notification for requester
+        let approvalNotification = null;
+        if (isAccessRequest) {
+          approvalNotification = new Notification({
+            recipient: targetUserId,
+            sender: userId, // owner
+            senderName: userName,
+            type: 'board_invite',
+            status: 'accepted',
+            boardId: board._id,
+            boardTitle: board.title,
+            message: `Your request to join workspace "${board.title}" was approved!`,
+          });
+          await approvalNotification.save();
+        }
 
         // Socket events for member added
         try {
           const io = getIo();
-          const encryptedUser = encryptUserIds(user);
+          const encryptedUser = encryptUserIds(targetUser);
           const encryptedBoard = encryptUserIds(board);
           
           if (io) {
@@ -90,55 +137,91 @@ export const respondToInvitation = async (req, res) => {
             });
           }
           
-          // Emit to user who accepted
-          emitToUser(userId, 'memberAdded', {
+          // Emit to user who was added
+          emitToUser(targetUserId, 'memberAdded', {
             boardId: encryptId(board._id),
             member: encryptedUser,
             board: encryptedBoard,
+            notification: approvalNotification ? encryptUserIds(approvalNotification) : undefined
           });
 
+          // Also emit new notification to the added user's inbox
+          if (approvalNotification) {
+            emitToUser(targetUserId, 'invitationSent', {
+              recipientId: encryptId(targetUserId),
+              notification: encryptUserIds(approvalNotification),
+            });
+          }
+
           // Emit to board creator (owner)
-          emitToUser(board.createdBy, 'memberAdded', {
-            boardId: encryptId(board._id),
-            member: encryptedUser,
-            board: encryptedBoard,
-          });
+          if (!isAccessRequest) {
+            emitToUser(board.createdBy, 'memberAdded', {
+              boardId: encryptId(board._id),
+              member: encryptedUser,
+              board: encryptedBoard,
+            });
+          }
         } catch (err) {
           console.error('Socket memberAdded emit error:', err);
         }
 
       } else {
+        // Reject Invitation / Request
+        if (isAccessRequest) {
+          // Remove from requests
+          if (board.requests) {
+            board.requests = board.requests.filter(r => r.toString() !== targetUserId.toString());
+            await board.save();
+          }
+        }
+
+        await AuditLog.create({
+          action: isAccessRequest ? 'Access Request Rejected' : 'Invite Rejected',
+          actorId: userId,
+          actorName: userName,
+          targetId: board._id,
+          targetName: board.title,
+          details: isAccessRequest
+            ? `${userName} declined access request from ${targetUserName} to join workspace "${board.title}"`
+            : `${userName} rejected invitation to join workspace "${board.title}"`,
+          ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || ''
+        }).catch(e => {});
+
         await createActivity({
           boardId: board._id,
-          userId,
-          userName,
+          userId: targetUserId,
+          userName: targetUserName,
           type: 'Invitation Rejected',
-          message: `${userName} declined invitation to join workspace "${board.title}"`,
+          message: isAccessRequest
+            ? `${userName} declined access request from ${targetUserName} to join workspace "${board.title}"`
+            : `${userName} declined invitation to join workspace "${board.title}"`,
         });
 
-        // Create notification for the owner
+        // Create notification for the requester/sender
         const rejectionNotification = new Notification({
-          recipient: notification.sender, // Owner
-          sender: userId, // Rejecting user
+          recipient: notification.sender, // The requester
+          sender: userId, // Rejecter
           senderName: userName,
           type: 'board_invite',
           status: 'rejected',
           boardId: board._id,
           boardTitle: board.title,
-          message: `${userName} rejected your invitation to join workspace: "${board.title}"`,
+          message: isAccessRequest
+            ? `Your request to join workspace "${board.title}" was declined.`
+            : `${userName} rejected your invitation to join workspace: "${board.title}"`,
         });
         await rejectionNotification.save();
 
-        // Socket events for invitation rejected
+        // Socket events for invitation/request rejected
         try {
           emitToUser(notification.sender, 'memberInviteRejected', {
             boardId: encryptId(board._id),
-            inviteeId: encryptId(userId),
-            inviteeName: userName,
+            inviteeId: encryptId(notification.sender),
+            inviteeName: targetUserName,
             notification: encryptUserIds(rejectionNotification),
           });
 
-          // Send notification to owner's inbox in real-time
+          // Send notification to inbox in real-time
           emitToUser(notification.sender, 'invitationSent', {
             recipientId: encryptId(notification.sender),
             notification: encryptUserIds(rejectionNotification),

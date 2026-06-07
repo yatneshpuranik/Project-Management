@@ -3,7 +3,9 @@ import genToken from '../configFiles/token.js';
 import bycrypt from 'bcryptjs';
 import Board from '../model/board.js';
 import Task from '../model/task.js';
+import AuditLog from '../model/auditLog.js';
 import { encryptUserIds, encryptId } from '../utils/idCrypt.js';
+import mongoose from 'mongoose';
 
 export const createUser = async (req, res) => {
     try {
@@ -40,6 +42,15 @@ export const createUser = async (req, res) => {
             email: normalizedEmail,
             password: hashedPassword
         });
+
+        // Log User Created Audit
+        await AuditLog.create({
+          action: 'User Created',
+          actorId: user._id,
+          actorName: user.name,
+          details: `User registered with email: ${user.email}`,
+          ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || ''
+        }).catch(e => {});
 
         const token = genToken(user._id);
         const safeUser = user.toObject();
@@ -85,6 +96,15 @@ export const loginUser = async (req, res) => {
         });
 
         if (!user) {
+            // Log failed login
+            await AuditLog.create({
+              action: 'Failed Login',
+              actorId: new mongoose.Types.ObjectId("000000000000000000000000"),
+              actorName: email,
+              details: `Login attempt failed: user not found`,
+              ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || ''
+            }).catch(e => {});
+
             return res.status(401).json({
                 success: false,
                 message: "Invalid credentials"
@@ -100,6 +120,15 @@ export const loginUser = async (req, res) => {
 
         const isMatch = await bycrypt.compare(password, user.password);
         if (!isMatch) {
+            // Log failed login
+            await AuditLog.create({
+              action: 'Failed Login',
+              actorId: user._id,
+              actorName: user.name,
+              details: `Login attempt failed: invalid password`,
+              ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || ''
+            }).catch(e => {});
+
             return res.status(401).json({
                 success: false,
                 message: "Invalid credentials"
@@ -138,6 +167,9 @@ export const getAllUsers = async (req, res) => {
         const { boardId, taskId } = req.query;
 
         if (boardId) {
+            if (!mongoose.Types.ObjectId.isValid(boardId)) {
+                return res.status(400).json({ message: 'Invalid board ID format' });
+            }
             const board = await Board.findById(boardId).populate('members', '-password').populate('createdBy', '-password');
             if (!board) {
                 return res.status(404).json({ message: 'Board not found' });
@@ -155,6 +187,9 @@ export const getAllUsers = async (req, res) => {
         }
 
         if (taskId) {
+            if (!mongoose.Types.ObjectId.isValid(taskId)) {
+                return res.status(400).json({ message: 'Invalid task ID format' });
+            }
             const task = await Task.findById(taskId).populate('collaborators', '-password').populate('assignedTo', '-password');
             if (!task) {
                 return res.status(404).json({ message: 'Task not found' });
@@ -235,8 +270,11 @@ export const getCurrentUser = async (req, res) => {
 
 export const getUserByID = async (req, res) => {
     try {
-
-        const user = await User.findById(req.params.id);
+        const { id } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ message: 'Invalid user ID format' });
+        }
+        const user = await User.findById(id);
 
         if (!user) {
             return res.status(404).json({
@@ -284,7 +322,9 @@ export const blockUser = async (req, res) => {
         }
 
         const { userId } = req.params;
-        const { reason } = req.body;
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({ success: false, message: 'Invalid user ID format' });
+        }
 
         const user = await User.findById(userId);
         if (!user) {
@@ -336,6 +376,9 @@ export const unblockUser = async (req, res) => {
         }
 
         const { userId } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({ success: false, message: 'Invalid user ID format' });
+        }
 
         const user = await User.findById(userId);
         if (!user) {
@@ -374,7 +417,26 @@ export const searchUsers = async (req, res) => {
         }
 
         const searchQuery = q.trim();
+        const Notification = (await import('../model/notification.js')).default;
+        
+        let board = null;
+        let excludeIds = [req.userId];
+
+        if (boardId) {
+            if (!mongoose.Types.ObjectId.isValid(boardId)) {
+                return res.status(400).json({ success: false, message: 'Invalid board ID format' });
+            }
+            board = await Board.findById(boardId);
+            if (board) {
+                if (board.createdBy) excludeIds.push(board.createdBy.toString());
+                if (board.members) {
+                    board.members.forEach(m => excludeIds.push(m.toString()));
+                }
+            }
+        }
+
         const users = await User.find({
+            _id: { $nin: excludeIds },
             isBlocked: { $ne: true },
             $or: [
                 { name: { $regex: searchQuery, $options: 'i' } },
@@ -384,37 +446,11 @@ export const searchUsers = async (req, res) => {
         .select('name email role avatar')
         .limit(10);
 
-        const Notification = (await import('../model/notification.js')).default;
-        
-        let board = null;
-        let pendingInvites = [];
-        if (boardId) {
-            board = await Board.findById(boardId);
-            pendingInvites = await Notification.find({
-                boardId,
-                type: 'board_invite',
-                status: 'pending'
-            });
-        }
-
         const safeUsers = users.map(user => {
             const u = user.toObject();
-            let inviteStatus = 'none';
-            if (board) {
-                const isMember = board.createdBy.toString() === u._id.toString() ||
-                                 board.members.some(m => m.toString() === u._id.toString());
-                if (isMember) {
-                    inviteStatus = 'member';
-                } else {
-                    const hasPending = pendingInvites.some(inv => inv.recipient.toString() === u._id.toString());
-                    if (hasPending) {
-                        inviteStatus = 'pending';
-                    }
-                }
-            }
-            
             const encryptedUser = encryptUserIds(u);
-            encryptedUser.inviteStatus = inviteStatus;
+            encryptedUser.inviteStatus = 'none';
+            encryptedUser.avatar = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name)}`;
             return encryptedUser;
         });
 
@@ -439,6 +475,9 @@ export const promoteUser = async (req, res) => {
         }
 
         const { userId } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({ success: false, message: 'Invalid user ID format' });
+        }
         const user = await User.findById(userId);
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found' });
@@ -465,6 +504,9 @@ export const demoteUser = async (req, res) => {
         }
 
         const { userId } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({ success: false, message: 'Invalid user ID format' });
+        }
         const user = await User.findById(userId);
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found' });

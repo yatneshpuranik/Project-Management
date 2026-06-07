@@ -30,7 +30,10 @@ const notificationSchema = new mongoose.Schema(
         'member_joined',
         'member_removed',
         'task_completed',
-        'workspace_message'
+        'workspace_message',
+        'comment',
+        'role_change',
+        'ownership_transfer'
       ],
       required: true,
     },

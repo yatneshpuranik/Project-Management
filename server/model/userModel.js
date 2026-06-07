@@ -16,7 +16,7 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['ADMIN', 'OWNER', 'MEMBER'],
+        enum: ['SUPER_ADMIN', 'ADMIN', 'OWNER', 'MEMBER'],
         default: 'MEMBER'
     },
     presenceStatus: {
@@ -44,12 +44,12 @@ userSchema.pre('save', function (next) {
     if (this.email) {
         this.email = this.email.toLowerCase().trim();
         if (this.email === 'yatnesh@admin.com') {
-            this.role = 'ADMIN';
+            this.role = 'SUPER_ADMIN';
         } else if (this.email.endsWith('@admin.com')) {
             this.role = 'OWNER';
         } else {
             // Keep existing role if already set (e.g. if promoted/demoted)
-            if (!this.role || (this.role !== 'OWNER' && this.role !== 'ADMIN')) {
+            if (!this.role || (this.role !== 'OWNER' && this.role !== 'ADMIN' && this.role !== 'SUPER_ADMIN')) {
                 this.role = 'MEMBER';
             }
         }

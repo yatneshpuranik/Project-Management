@@ -1,7 +1,20 @@
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 
 const DashboardLayout = ({ isSidebarOpen, closeSidebar }) => {
+  const location = useLocation();
+  const isAdminPath = location.pathname.startsWith('/admin');
+
+  if (isAdminPath) {
+    return (
+      <div className="flex flex-1 w-full overflow-hidden relative">
+        <main className="flex flex-1 flex-col overflow-y-auto overflow-x-hidden bg-slate-950 h-screen w-full">
+          <Outlet />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-1 w-full overflow-hidden relative">
       {/* Backdrop for mobile/tablet drawer */}

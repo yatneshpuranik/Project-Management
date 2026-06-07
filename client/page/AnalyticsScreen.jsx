@@ -1,16 +1,26 @@
 import { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { fetchBoards } from '../redux/boardSlice';
 import axiosInstance from '../utils/axiosInstance';
 import { HiOutlineTrendingUp, HiOutlineChartBar, HiOutlineCheckCircle, HiOutlineClock, HiOutlineChevronDown } from 'react-icons/hi';
+import { toast } from '../utils/toast';
 
 const AnalyticsScreen = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { boards, currentBoard } = useSelector((state) => state.boards);
   const [selectedBoardId, setSelectedBoardId] = useState('');
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!currentBoard?._id) {
+      toast.error('Please select a workspace first.');
+      navigate('/boards');
+    }
+  }, [currentBoard, navigate]);
 
   useEffect(() => {
     dispatch(fetchBoards());

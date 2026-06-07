@@ -298,7 +298,17 @@ const Navbar = ({ toggleSidebar }) => {
                                   ? 'Task Assignment'
                                   : notif.type === 'board_invite'
                                     ? 'Workspace Invitation'
-                                    : 'Task Invitation'}
+                                    : notif.type === 'task_invite'
+                                      ? 'Task Invitation'
+                                      : notif.type === 'mention'
+                                        ? 'Comment Mention'
+                                        : notif.type === 'task_completed'
+                                          ? 'Task Completed'
+                                          : notif.type === 'ownership_transfer'
+                                            ? 'Ownership Transfer'
+                                            : notif.type === 'role_change'
+                                              ? 'Role Change'
+                                              : 'Notification'}
                               </p>
                               <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded capitalize ${
                                 notif.type === 'task_assign'
@@ -316,14 +326,24 @@ const Navbar = ({ toggleSidebar }) => {
                               {notif.type === 'task_assign'
                                 ? 'You have been assigned to:'
                                 : notif.type === 'board_invite'
-                                  ? 'You have been invited to join workspace:'
-                                  : 'You have been invited to collaborate on:'}
+                                  ? 'Workspace invitation details:'
+                                  : notif.type === 'task_invite'
+                                    ? 'You have been invited to collaborate on:'
+                                    : notif.type === 'mention'
+                                      ? 'You were mentioned in:'
+                                      : notif.type === 'task_completed'
+                                        ? 'A task was completed:'
+                                        : 'Notification details:'}
                             </p>
                             <p className="text-[11px] font-bold text-white mt-0.5 italic">
-                              "{notif.type === 'board_invite' ? notif.boardTitle || notif.message : notif.taskTitle}"
+                              "{notif.type === 'board_invite'
+                                ? notif.boardTitle || notif.message
+                                : notif.type === 'task_assign' || notif.type === 'task_invite' || notif.type === 'task_completed'
+                                  ? notif.taskTitle || notif.message
+                                  : notif.message}"
                             </p>
                             <p className="text-[9px] text-slate-500 mt-1">
-                              {notif.type === 'task_assign' ? 'Assigned By:' : 'Invited By:'} <span className="font-medium text-slate-300">{notif.senderName}</span>
+                              {notif.type === 'task_assign' ? 'Assigned By:' : 'Sender:'} <span className="font-medium text-slate-300">{notif.senderName}</span>
                             </p>
 
                             {isPendingInvite && (

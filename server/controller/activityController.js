@@ -2,6 +2,7 @@ import Activity from '../model/activity.js';
 import Board from '../model/board.js';
 import Task from '../model/task.js';
 import { getIo } from '../socket/socket.js';
+import mongoose from 'mongoose';
 
 const isBoardMember = (board, userId) =>
   board && (board.createdBy.toString() === userId || board.members.some((member) => member.toString() === userId));
@@ -10,6 +11,10 @@ export const getActivitiesByBoard = async (req, res) => {
   try {
     const { boardId } = req.params;
     const userId = req.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(boardId)) {
+      return res.status(400).json({ message: 'Invalid board ID format' });
+    }
 
     const board = await Board.findById(boardId);
     if (!board) {
@@ -34,6 +39,10 @@ export const getActivitiesByTask = async (req, res) => {
   try {
     const { taskId } = req.params;
     const userId = req.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ message: 'Invalid task ID format' });
+    }
 
     const task = await Task.findById(taskId);
     if (!task) {

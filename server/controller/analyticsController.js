@@ -3,11 +3,16 @@ import Board from '../model/board.js';
 import User from '../model/userModel.js';
 import Activity from '../model/activity.js';
 import { encryptUserIds, encryptId } from '../utils/idCrypt.js';
+import mongoose from 'mongoose';
 
 export const getBoardAnalytics = async (req, res) => {
   try {
     const { boardId } = req.params;
     const userId = req.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(boardId)) {
+      return res.status(400).json({ message: 'Invalid board ID format' });
+    }
 
     const board = await Board.findById(boardId);
     if (!board) {

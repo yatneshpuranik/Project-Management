@@ -6,6 +6,7 @@ import User from '../model/userModel.js';
 import { getIo, evictUserFromBoard, emitToUser } from '../socket/socket.js';
 import { encryptUserIds, encryptId } from '../utils/idCrypt.js';
 import Notification from '../model/notification.js';
+import AuditLog from '../model/auditLog.js';
 
 // Create Board
 export const createBoard = async (req, res) => {
@@ -14,7 +15,7 @@ export const createBoard = async (req, res) => {
     const userId = req.userId;
 
     const user = await User.findById(userId);
-    if (!user || (user.role !== 'OWNER' && user.role !== 'ADMIN')) {
+    if (!user || (user.role !== 'OWNER' && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
       return res.status(403).json({ message: 'Forbidden: Only users with role OWNER or ADMIN can create workspaces' });
     }
 
@@ -33,6 +34,17 @@ export const createBoard = async (req, res) => {
 
     await board.save();
     await board.populate(['createdBy', 'members']);
+
+    // Log Workspace Created
+    await AuditLog.create({
+      action: 'Workspace Created',
+      actorId: userId,
+      actorName: user.name,
+      targetId: board._id,
+      targetName: board.title,
+      details: `Workspace created by ${user.name} (${user.email})`,
+      ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || ''
+    }).catch(e => {});
 
     res.status(201).json({
       message: 'Board created successfully',
@@ -84,8 +96,8 @@ export const getBoardById = async (req, res) => {
 
     // Check if user is member
     const isMember =
-      board.createdBy._id.toString() === userId ||
-      board.members.some((member) => member._id.toString() === userId);
+      (board.createdBy?._id || board.createdBy || '').toString() === userId ||
+      board.members.some((member) => (member?._id || member || '').toString() === userId);
 
     if (!isMember) {
       return res.status(403).json({ message: 'Unauthorized access' });
@@ -118,7 +130,7 @@ export const updateBoard = async (req, res) => {
     }
 
     // Only creator or platform admin can edit board details
-    const isCreator = board.createdBy.toString() === userId;
+    const isCreator = (board.createdBy?._id || board.createdBy || '').toString() === userId;
     const isAdmin = req.user?.role === 'ADMIN';
     if (!isCreator && !isAdmin) {
       return res.status(403).json({ message: 'Only board creator or admin can edit' });
@@ -157,9 +169,20 @@ export const deleteBoard = async (req, res) => {
       return res.status(404).json({ message: 'Board not found' });
     }
 
-    if (board.createdBy.toString() !== userId) {
+    if ((board.createdBy?._id || board.createdBy || '').toString() !== userId) {
       return res.status(403).json({ message: 'Only board creator can delete' });
     }
+
+    // Log Workspace Deleted
+    await AuditLog.create({
+      action: 'Workspace Deleted',
+      actorId: userId,
+      actorName: req.userName || 'Owner',
+      targetId: board._id,
+      targetName: board.title,
+      details: `Workspace deleted by owner: ${board.title}`,
+      ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || ''
+    }).catch(e => {});
 
     // Delete all tasks in this board
     await Task.deleteMany({ boardId });
@@ -194,11 +217,11 @@ export const addMember = async (req, res) => {
       return res.status(404).json({ message: 'Board not found' });
     }
 
-    if (board.createdBy.toString() !== userId) {
+    if ((board.createdBy?._id || board.createdBy || '').toString() !== userId) {
       return res.status(403).json({ message: 'Only board creator can add members' });
     }
 
-    if (board.createdBy.toString() === memberId) {
+    if ((board.createdBy?._id || board.createdBy || '').toString() === memberId) {
       return res.status(400).json({ message: 'Owner cannot be invited again' });
     }
 
@@ -237,6 +260,17 @@ export const addMember = async (req, res) => {
     });
 
     await notification.save();
+
+    // Log Invite Sent
+    await AuditLog.create({
+      action: 'Invite Sent',
+      actorId: userId,
+      actorName: req.userName || 'Owner',
+      targetId: board._id,
+      targetName: board.title,
+      details: `Invitation sent to ${memberUser.name} (${memberUser.email})`,
+      ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || ''
+    }).catch(e => {});
 
     await createActivity({
       boardId,
@@ -284,11 +318,11 @@ export const removeMember = async (req, res) => {
       return res.status(404).json({ message: 'Board not found' });
     }
 
-    if (board.createdBy.toString() !== userId) {
+    if ((board.createdBy?._id || board.createdBy || '').toString() !== userId) {
       return res.status(403).json({ message: 'Only board creator can remove members' });
     }
 
-    if (board.createdBy.toString() === memberId) {
+    if ((board.createdBy?._id || board.createdBy || '').toString() === memberId) {
       return res.status(400).json({ message: 'Owner cannot be removed from the board' });
     }
 
@@ -360,7 +394,7 @@ export const removeMember = async (req, res) => {
 // Search / Browse Workspaces
 export const searchWorkspaces = async (req, res) => {
   try {
-    const { q } = req.query;
+    const { q, filter } = req.query;
     const userId = req.userId;
 
     const query = {};
@@ -368,13 +402,24 @@ export const searchWorkspaces = async (req, res) => {
       query.title = { $regex: q.trim(), $options: 'i' };
     }
 
+    if (filter === 'public') {
+      query.visibility = 'public';
+    } else if (filter === 'private') {
+      query.visibility = 'private';
+    } else if (filter === 'joined') {
+      query.members = userId;
+      query.createdBy = { $ne: userId };
+    } else if (filter === 'owned') {
+      query.createdBy = userId;
+    }
+
     const boards = await Board.find(query)
       .populate('createdBy', 'name email avatar')
       .limit(30);
 
     const safeBoards = boards.map(board => {
-      const isCreator = board.createdBy._id.toString() === userId;
-      const isMember = board.members.some(m => m.toString() === userId);
+      const isCreator = (board.createdBy?._id || board.createdBy || '').toString() === userId;
+      const isMember = board.members.some(m => (m?._id || m || '').toString() === userId);
       const isPending = board.requests?.some(r => r.toString() === userId);
 
       let joinStatus = 'none';
@@ -410,6 +455,10 @@ export const joinPublicWorkspace = async (req, res) => {
     const { boardId } = req.params;
     const userId = req.userId;
 
+    if (!mongoose.Types.ObjectId.isValid(boardId)) {
+      return res.status(400).json({ message: 'Invalid board ID format' });
+    }
+
     const board = await Board.findById(boardId);
     if (!board) {
       return res.status(404).json({ message: 'Workspace not found' });
@@ -419,7 +468,7 @@ export const joinPublicWorkspace = async (req, res) => {
       return res.status(400).json({ message: 'Cannot join private workspace directly. Request access instead.' });
     }
 
-    const isMember = board.createdBy.toString() === userId || board.members.some(m => m.toString() === userId);
+    const isMember = (board.createdBy?._id || board.createdBy || '').toString() === userId || board.members.some(m => m.toString() === userId);
     if (isMember) {
       return res.status(400).json({ message: 'You are already a member of this workspace' });
     }
@@ -468,6 +517,10 @@ export const requestAccess = async (req, res) => {
     const { boardId } = req.params;
     const userId = req.userId;
 
+    if (!mongoose.Types.ObjectId.isValid(boardId)) {
+      return res.status(400).json({ message: 'Invalid board ID format' });
+    }
+
     const board = await Board.findById(boardId);
     if (!board) {
       return res.status(404).json({ message: 'Workspace not found' });
@@ -477,7 +530,7 @@ export const requestAccess = async (req, res) => {
       return res.status(400).json({ message: 'Workspace is public, join directly' });
     }
 
-    const isMember = board.createdBy.toString() === userId || board.members.some(m => m.toString() === userId);
+    const isMember = (board.createdBy?._id || board.createdBy || '').toString() === userId || board.members.some(m => m.toString() === userId);
     if (isMember) {
       return res.status(400).json({ message: 'You are already a member of this workspace' });
     }
@@ -534,12 +587,19 @@ export const acceptAccessRequest = async (req, res) => {
     const { boardId, userId } = req.params;
     const currentUserId = req.userId;
 
+    if (!mongoose.Types.ObjectId.isValid(boardId)) {
+      return res.status(400).json({ message: 'Invalid board ID format' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID format' });
+    }
+
     const board = await Board.findById(boardId);
     if (!board) {
       return res.status(404).json({ message: 'Workspace not found' });
     }
 
-    if (board.createdBy.toString() !== currentUserId) {
+    if ((board.createdBy?._id || board.createdBy || '').toString() !== currentUserId) {
       return res.status(403).json({ message: 'Only workspace owner can accept requests' });
     }
 
@@ -621,12 +681,19 @@ export const rejectAccessRequest = async (req, res) => {
     const { boardId, userId } = req.params;
     const currentUserId = req.userId;
 
+    if (!mongoose.Types.ObjectId.isValid(boardId)) {
+      return res.status(400).json({ message: 'Invalid board ID format' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID format' });
+    }
+
     const board = await Board.findById(boardId);
     if (!board) {
       return res.status(404).json({ message: 'Workspace not found' });
     }
 
-    if (board.createdBy.toString() !== currentUserId) {
+    if ((board.createdBy?._id || board.createdBy || '').toString() !== currentUserId) {
       return res.status(403).json({ message: 'Only workspace owner can reject requests' });
     }
 
@@ -665,5 +732,83 @@ export const rejectAccessRequest = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Error rejecting access request', error: error.message });
+  }
+};
+
+// Leave Board / Workspace
+export const leaveBoard = async (req, res) => {
+  try {
+    const { boardId } = req.params;
+    const userId = req.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(boardId)) {
+      return res.status(400).json({ message: 'Invalid board ID format' });
+    }
+
+    const board = await Board.findById(boardId);
+    if (!board) {
+      return res.status(404).json({ message: 'Workspace not found' });
+    }
+
+    const isOwner = (board.createdBy?._id || board.createdBy || '').toString() === userId;
+    if (isOwner) {
+      return res.status(400).json({ message: 'Owner cannot leave workspace until ownership is transferred.' });
+    }
+
+    const isMember = board.members.some((m) => m.toString() === userId);
+    if (!isMember) {
+      return res.status(400).json({ message: 'You are not a member of this workspace' });
+    }
+
+    // Remove user from members array
+    board.members = board.members.filter((m) => m.toString() !== userId);
+    await board.save();
+
+    // Clean up task assignments and collaborators for the leaving user in this board
+    await Task.updateMany(
+      { boardId, assignedTo: userId },
+      { $unset: { assignedTo: 1, assignedBy: 1 } }
+    );
+    await Task.updateMany(
+      { boardId },
+      { $pull: { collaborators: userId } }
+    );
+
+    // Clean up notifications for the leaving member in this board
+    try {
+      await Notification.deleteMany({ boardId, recipient: userId });
+    } catch (e) {
+      // Ignore
+    }
+
+    const userRecord = await User.findById(userId);
+    const userName = userRecord ? userRecord.name : 'A member';
+
+    await createActivity({
+      boardId,
+      userId,
+      userName,
+      type: 'Member Left',
+      message: `${userName} has left the workspace.`,
+    });
+
+    try {
+      evictUserFromBoard(boardId, userId);
+      const io = getIo();
+      if (io) {
+        io.to(`board-${board._id.toString()}`).emit('memberRemoved', {
+          boardId: encryptId(board._id),
+          memberId: encryptId(userId),
+        });
+      }
+    } catch (err) {
+      // Ignore
+    }
+
+    res.status(200).json({
+      message: 'Successfully left the workspace',
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error leaving workspace', error: error.message });
   }
 };
