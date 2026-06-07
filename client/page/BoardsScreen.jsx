@@ -85,7 +85,9 @@ const BoardsScreen = () => {
   const [isSearching, setIsSearching] = useState(false)
 
   // Ownership transfer state
-  const [newOwnerId, setNewOwnerId] = useState('')
+  const [transferSearch, setTransferSearch] = useState('')
+  const [transferSearchResults, setTransferSearchResults] = useState([])
+  const [selectedTransferUser, setSelectedTransferUser] = useState(null)
 
   // Create Workspace Dialog States
   const [title, setTitle] = useState('')
@@ -172,6 +174,23 @@ const BoardsScreen = () => {
     }, 500)
     return () => clearTimeout(delayDebounce)
   }, [inviteSearch, boardId])
+
+  // Search users for transfer ownership
+  useEffect(() => {
+    if (!transferSearch.trim()) {
+      setTransferSearchResults([])
+      return
+    }
+    const delayDebounce = setTimeout(async () => {
+      try {
+        const response = await axiosInstance.get(`/user/search?q=${encodeURIComponent(transferSearch)}`)
+        setTransferSearchResults(response.data.users || [])
+      } catch (err) {
+        console.error('Transfer search error:', err)
+      }
+    }, 500)
+    return () => clearTimeout(delayDebounce)
+  }, [transferSearch])
 
   // Real-time Sockets Integration
   useEffect(() => {
@@ -319,11 +338,12 @@ const BoardsScreen = () => {
   // Transfer Ownership
   const handleTransfer = async (e) => {
     e.preventDefault()
-    if (!newOwnerId.trim()) return
+    if (!selectedTransferUser) return
+    const newOwnerId = selectedTransferUser._id
     try {
-      await axiosInstance.put(`/boards/${boardId}`, { createdBy: newOwnerId.trim() })
+      await axiosInstance.put(`/boards/${boardId}`, { createdBy: newOwnerId })
       toast.success('Ownership transferred successfully.')
-      setNewOwnerId('')
+      setSelectedTransferUser(null)
       dispatch(fetchBoardById(boardId))
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to transfer ownership.')
@@ -853,16 +873,26 @@ const BoardsScreen = () => {
                         ) : searchResults.length > 0 ? (
                           searchResults.map((user) => (
                             <div key={user._id} className="flex justify-between items-center p-2 rounded-xl bg-slate-950/40 border border-white/5 text-[11px] gap-2">
-                              <div className="min-w-0">
-                                <p className="font-bold text-slate-200 truncate">{user.name}</p>
-                                <p className="text-slate-500 text-[10px] truncate">{user.email}</p>
+                              <div className="flex items-center gap-2 min-w-0">
+                                <img
+                                  src={user.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name)}`}
+                                  alt={user.name}
+                                  className="h-6 w-6 rounded-full flex-shrink-0 border border-white/10"
+                                />
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-bold text-slate-200 truncate">{user.name}</span>
+                                    <span className="bg-slate-800 text-[8px] px-1 text-slate-400 rounded uppercase font-semibold">{user.role || 'USER'}</span>
+                                  </div>
+                                  <p className="text-slate-500 text-[9px] truncate">{user.email}</p>
+                                </div>
                               </div>
                               {user.inviteStatus === 'pending' ? (
                                 <span className="bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded font-semibold text-[10px]">Pending</span>
                               ) : (
                                 <button
                                   onClick={() => handleSendInvite(user._id)}
-                                  className="px-2 py-1 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-lg transition"
+                                  className="px-2.5 py-1 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-lg transition cursor-pointer"
                                 >
                                   Invite
                                 </button>
@@ -945,22 +975,82 @@ const BoardsScreen = () => {
               {isOwner ? (
                 <div className="space-y-4 pt-2 border-t border-white/5">
                   {/* Ownership Transfer */}
-                  <form onSubmit={handleTransfer} className="space-y-1.5">
-                    <label className="block text-[9px] uppercase font-bold text-slate-400">Transfer Ownership (User ID)</label>
-                    <div className="flex gap-2">
-                      <input
-                        value={newOwnerId}
-                        onChange={(e) => setNewOwnerId(e.target.value)}
-                        placeholder="Paste user id..."
-                        className="flex-1 bg-slate-950 border border-white/10 rounded-xl px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
-                      />
-                      <button
-                        type="submit"
-                        className="px-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[10px] rounded-xl transition cursor-pointer"
-                      >
-                        Transfer
-                      </button>
-                    </div>
+                  <form onSubmit={handleTransfer} className="space-y-3 pt-2">
+                    <label className="block text-[9px] uppercase font-bold text-slate-400">Transfer Ownership</label>
+                    
+                    {!selectedTransferUser ? (
+                      <div className="relative">
+                        <input
+                          value={transferSearch}
+                          onChange={(e) => setTransferSearch(e.target.value)}
+                          placeholder="Search member by name or email..."
+                          className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 outline-none focus:border-cyan-500"
+                        />
+                        {transferSearchResults.length > 0 && (
+                          <div className="absolute left-0 right-0 mt-1 z-50 max-h-40 overflow-y-auto bg-slate-900 border border-white/10 rounded-xl shadow-2xl p-2 space-y-1 custom-scrollbar">
+                            {transferSearchResults.map((u) => (
+                              <div
+                                key={u._id}
+                                onClick={() => {
+                                  setSelectedTransferUser(u)
+                                  setTransferSearch('')
+                                  setTransferSearchResults([])
+                                }}
+                                className="flex items-center justify-between p-2 rounded-lg hover:bg-white/5 cursor-pointer text-xs gap-2"
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <img
+                                    src={u.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(u.name)}`}
+                                    alt={u.name}
+                                    className="h-6 w-6 rounded-full flex-shrink-0 border border-white/10"
+                                  />
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-bold text-slate-200 truncate">{u.name}</span>
+                                      <span className="bg-slate-800 text-[8px] px-1 text-slate-400 rounded uppercase font-semibold">{u.role || 'USER'}</span>
+                                    </div>
+                                    <p className="text-slate-500 text-[9px] truncate">{u.email}</p>
+                                  </div>
+                                </div>
+                                <span className="text-[10px] text-sky-400 font-bold bg-sky-500/10 px-2 py-0.5 rounded">Select</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-slate-950 border border-white/5 rounded-xl flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <img
+                            src={selectedTransferUser.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(selectedTransferUser.name)}`}
+                            alt={selectedTransferUser.name}
+                            className="h-8 w-8 rounded-full flex-shrink-0 border border-white/10"
+                          />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-white text-xs truncate">{selectedTransferUser.name}</span>
+                              <span className="bg-slate-800 text-[8px] px-1 text-slate-400 rounded uppercase font-semibold">{selectedTransferUser.role || 'USER'}</span>
+                            </div>
+                            <p className="text-[10px] text-slate-500 truncate">{selectedTransferUser.email}</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTransferUser(null)}
+                          className="text-slate-400 hover:text-white text-[10px] font-semibold border border-white/10 hover:border-white/20 rounded-lg px-2 py-1 transition cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={!selectedTransferUser}
+                      className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed text-slate-950 font-bold text-xs rounded-xl transition cursor-pointer"
+                    >
+                      Confirm Ownership Transfer
+                    </button>
                   </form>
 
                   {/* Permanent delete workspace */}

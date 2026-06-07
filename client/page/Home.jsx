@@ -8,7 +8,11 @@ const Home = () => {
 
   useEffect(() => {
     if (user) {
-      navigate('/boards')
+      if (user.role === 'ADMIN') {
+        navigate('/admin')
+      } else {
+        navigate('/boards')
+      }
     }
   }, [user, navigate])
 

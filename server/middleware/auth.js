@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import User from '../model/userModel.js';
+import { decryptRequestData } from '../utils/idCrypt.js';
 
 
 export const authenticateToken = async (req, res, next) => {
@@ -15,6 +16,10 @@ export const authenticateToken = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
     req.userId = decoded.id;
+
+    if (req.params) {
+      req.params = decryptRequestData(req.params);
+    }
 
     const user = await User.findById(req.userId).select('-password');
     if (user) {

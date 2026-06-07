@@ -138,7 +138,10 @@ const TaskDetailsDrawer = ({ taskId, boardId, isOpen, onClose }) => {
 
     const onCommentAdded = (data) => {
       if (data.taskId === taskId) {
-        setComments((prev) => [...prev, data.comment]);
+        setComments((prev) => {
+          if (prev.some((c) => c._id === data.comment?._id)) return prev;
+          return [...prev, data.comment];
+        });
       }
     };
 

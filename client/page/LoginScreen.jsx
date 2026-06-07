@@ -50,18 +50,28 @@ const LoginScreen = () => {
           localStorage.setItem('userId', result.data.user._id)
           localStorage.setItem('userName', result.data.user.name)
           localStorage.setItem('userEmail', result.data.user.email)
-          localStorage.setItem('userRole', result.data.user.role || 'USER')
+          const role = result.data.user.role || 'USER'
+          localStorage.setItem('userRole', role)
           dispatch(setUser(result.data.user))
-          navigate('/boards')
+          if (role === 'ADMIN') {
+            navigate('/admin')
+          } else {
+            navigate('/boards')
+          }
         }, 1200)
       } else {
         localStorage.setItem('token', result.data.token)
         localStorage.setItem('userId', result.data.user._id)
         localStorage.setItem('userName', result.data.user.name)
         localStorage.setItem('userEmail', result.data.user.email)
-        localStorage.setItem('userRole', result.data.user.role || 'USER')
+        const role = result.data.user.role || 'USER'
+        localStorage.setItem('userRole', role)
         dispatch(setUser(result.data.user))
-        navigate('/boards')
+        if (role === 'ADMIN') {
+          navigate('/admin')
+        } else {
+          navigate('/boards')
+        }
       }
     } catch (err) {
       console.error('Auth request failed:', err)

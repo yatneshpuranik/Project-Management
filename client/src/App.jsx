@@ -98,12 +98,12 @@ const App = () => {
       {authChecked ? (
         <Routes>
           <Route path='/' element={<Home />} />
-          <Route path='/login' element={user ? <Navigate to='/boards' replace /> : <LoginScreen />} />
+          <Route path='/login' element={user ? (user.role === 'ADMIN' ? <Navigate to='/admin' replace /> : <Navigate to='/boards' replace />) : <LoginScreen />} />
           
           {/* Protected Area Layout */}
           <Route
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['USER']}>
                 <DashboardLayout isSidebarOpen={isSidebarOpen} closeSidebar={closeSidebar} />
               </ProtectedRoute>
             }
@@ -116,11 +116,11 @@ const App = () => {
             <Route path='/analytics' element={<AnalyticsScreen />} />
             <Route path='/settings' element={<SettingsScreen />} />
           </Route>
-
+ 
           {/* Admin Protected Area */}
           <Route
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['ADMIN']}>
                 <AdminLayout />
               </ProtectedRoute>
             }

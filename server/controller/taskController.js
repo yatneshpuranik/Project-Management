@@ -13,6 +13,22 @@ const isBoardMember = (board, userId) => {
   const ownerId = (board.createdBy?._id || board.createdBy || '').toString();
   return ownerId === userId || board.members.some((member) => (member?._id || member || '').toString() === userId);
 };
+const applyAutoStatus = (task) => {
+  const p = task.progress || 0;
+  if (p === 0) {
+    task.status = 'Todo';
+  } else if (p > 0 && p < 100) {
+    task.status = 'In Progress';
+  } else if (p === 100) {
+    if (task.status === 'Todo') {
+      task.status = 'In Progress';
+    } else if (task.status === 'In Progress') {
+      task.status = 'Review';
+    } else if (task.status === 'Review') {
+      task.status = 'Done';
+    }
+  }
+};
 
 const ensureTaskBoardMembership = async (task, userId) => {
   if (!task) return false;
@@ -82,6 +98,8 @@ export const createTask = async (req, res) => {
       checklist: checklist || [],
       progress: initialProgress,
     });
+
+    applyAutoStatus(task);
 
     await task.save();
     await task.populate(['assignedTo', 'createdBy', 'parentTaskId']);
@@ -361,6 +379,10 @@ export const updateTask = async (req, res) => {
       }
     });
 
+    if (updates.progress !== undefined) {
+      applyAutoStatus(task);
+    }
+
     await task.save();
     await task.populate(['assignedTo', 'createdBy', 'collaborators']);
 
@@ -400,11 +422,7 @@ export const moveTask = async (req, res) => {
     }
 
     const board = await Board.findById(task.boardId);
-    const isMember =
-      (board.createdBy?._id || board.createdBy || '').toString() === userId ||
-      board.members.some((member) => (member?._id || member || '').toString() === userId);
-
-    if (!isMember) {
+    if (!board || !isBoardMember(board, userId)) {
       return res.status(403).json({ message: 'Unauthorized access' });
     }
 
@@ -575,7 +593,8 @@ export const getComments = async (req, res) => {
       return res.status(404).json({ message: 'Task not found' });
     }
     const board = await Board.findById(task.boardId);
-    if (!isBoardMember(board, req.userId)) {
+    const isAdmin = req.user?.role === 'ADMIN';
+    if (!isBoardMember(board, req.userId) && !isAdmin) {
       return res.status(403).json({ message: 'Unauthorized access' });
     }
     res.status(200).json({
@@ -790,7 +809,8 @@ export const deleteComment = async (req, res) => {
       return res.status(404).json({ message: 'Task not found' });
     }
     const boardRecord = await Board.findById(task.boardId);
-    if (!boardRecord || !isBoardMember(boardRecord, userId)) {
+    const isAdmin = req.user?.role === 'ADMIN';
+    if (!boardRecord || (!isBoardMember(boardRecord, userId) && !isAdmin)) {
       return res.status(403).json({ message: 'Unauthorized access' });
     }
 
@@ -802,12 +822,12 @@ export const deleteComment = async (req, res) => {
     const isCommentOwner = comment.userId.toString() === userId;
     const isBoardOwner = boardRecord.createdBy.toString() === userId;
 
-    if (!isCommentOwner && !isBoardOwner) {
+    if (!isCommentOwner && !isBoardOwner && !isAdmin) {
       return res.status(403).json({ message: 'Unauthorized comment deletion' });
     }
 
     const commentIdRaw = comment._id;
-    comment.deleteOne();
+    task.comments.pull(commentId);
     await task.save();
 
     try {
@@ -1206,6 +1226,8 @@ export const addTaskChecklistItem = async (req, res) => {
     const completedCount = task.checklist.filter(item => item.completed).length;
     task.progress = Math.round((completedCount / task.checklist.length) * 100);
 
+    applyAutoStatus(task);
+
     await task.save();
     await task.populate(['assignedTo', 'createdBy', 'collaborators', 'parentTaskId']);
 
@@ -1264,11 +1286,7 @@ export const updateTaskChecklistItem = async (req, res) => {
     const completedCount = task.checklist.filter(item => item.completed).length;
     task.progress = Math.round((completedCount / task.checklist.length) * 100);
 
-    // If progress becomes 100% and status was not Done, should we log activity?
-    const oldStatus = task.status;
-    if (task.progress === 100 && oldStatus !== 'Done') {
-      // Just progress tracking, status remains or can be completed
-    }
+    applyAutoStatus(task);
 
     await task.save();
     await task.populate(['assignedTo', 'createdBy', 'collaborators', 'parentTaskId']);
@@ -1329,6 +1347,8 @@ export const deleteTaskChecklistItem = async (req, res) => {
     } else {
       task.progress = 0;
     }
+
+    applyAutoStatus(task);
 
     await task.save();
     await task.populate(['assignedTo', 'createdBy', 'collaborators', 'parentTaskId']);

@@ -116,7 +116,7 @@ export const getBoardById = async (req, res) => {
 export const updateBoard = async (req, res) => {
   try {
     const { boardId } = req.params;
-    const { title, description, visibility, channels } = req.body;
+    const { title, description, visibility, channels, createdBy } = req.body;
     const userId = req.userId;
 
     if (!mongoose.Types.ObjectId.isValid(boardId)) {
@@ -134,6 +134,61 @@ export const updateBoard = async (req, res) => {
     const isAdmin = req.user?.role === 'ADMIN';
     if (!isCreator && !isAdmin) {
       return res.status(403).json({ message: 'Only board creator or admin can edit' });
+    }
+
+    // Handle Ownership Transfer
+    if (createdBy && createdBy !== board.createdBy.toString()) {
+      if (!mongoose.Types.ObjectId.isValid(createdBy)) {
+        return res.status(400).json({ message: 'Invalid new owner ID format' });
+      }
+      const newOwner = await User.findById(createdBy);
+      if (!newOwner) {
+        return res.status(404).json({ message: 'New owner user not found' });
+      }
+
+      const oldOwnerId = board.createdBy.toString();
+      board.createdBy = createdBy;
+
+      // Ensure both are members
+      if (!board.members.some((m) => m.toString() === createdBy)) {
+        board.members.push(createdBy);
+      }
+      if (!board.members.some((m) => m.toString() === oldOwnerId)) {
+        board.members.push(oldOwnerId);
+      }
+
+      // Log/Create Activity
+      await createActivity({
+        boardId: board._id,
+        userId,
+        userName: req.userName || 'Owner',
+        type: 'ownership_transfer',
+        message: `${req.userName || 'Owner'} transferred workspace ownership to ${newOwner.name}`,
+      });
+
+      // Notification
+      const notifNew = new Notification({
+        recipient: createdBy,
+        sender: userId,
+        senderName: req.userName || 'Owner',
+        type: 'ownership_transfer',
+        status: 'unread',
+        boardId: board._id,
+        boardTitle: board.title,
+        message: `${req.userName || 'Owner'} has transferred ownership of workspace: "${board.title}" to you.`,
+      });
+      await notifNew.save();
+
+      try {
+        emitToUser(createdBy, 'invitationSent', {
+          recipientId: encryptId(createdBy),
+          notification: encryptUserIds(notifNew),
+        });
+        emitToUser(oldOwnerId, 'ownership-transferred', {
+          boardId: encryptId(board._id),
+          newOwnerId: encryptId(createdBy),
+        });
+      } catch (e) {}
     }
 
     if (title) board.title = title;
