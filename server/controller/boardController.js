@@ -414,6 +414,28 @@ export const removeMember = async (req, res) => {
       console.error('Error cleaning up notifications:', e);
     }
 
+    // Notify the evicted member
+    try {
+      const Notification = mongoose.model('Notification');
+      const removeNotif = new Notification({
+        recipient: memberId,
+        sender: userId,
+        senderName: req.userName || 'Owner',
+        type: 'member_removed',
+        status: 'unread',
+        boardId: board._id,
+        boardTitle: board.title,
+        message: `You were removed from workspace "${board.title}" by the owner`,
+      });
+      await removeNotif.save();
+      emitToUser(memberId, 'invitationSent', {
+        recipientId: encryptId(memberId),
+        notification: encryptUserIds(removeNotif),
+      });
+    } catch (e) {
+      console.error('Error creating member removed notification:', e);
+    }
+
     await board.populate(['createdBy', 'members']);
 
     await createActivity({
@@ -534,6 +556,27 @@ export const joinPublicWorkspace = async (req, res) => {
 
     const user = await User.findById(userId);
     const userName = user ? user.name : 'A user';
+
+    // Notify board owner
+    if (board.createdBy && board.createdBy.toString() !== userId) {
+      const joinNotif = new Notification({
+        recipient: board.createdBy,
+        sender: userId,
+        senderName: userName,
+        type: 'member_joined',
+        status: 'unread',
+        boardId: board._id,
+        boardTitle: board.title,
+        message: `${userName} joined your public workspace "${board.title}"`,
+      });
+      await joinNotif.save();
+      try {
+        emitToUser(board.createdBy.toString(), 'invitationSent', {
+          recipientId: encryptId(board.createdBy),
+          notification: encryptUserIds(joinNotif),
+        });
+      } catch (e) {}
+    }
 
     await createActivity({
       boardId: board._id,

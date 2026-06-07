@@ -14,12 +14,22 @@ export const getNotifications = async (req, res) => {
     const userId = req.userId;
 
     const notifications = await Notification.find({ recipient: userId })
-      .populate('sender', 'name email avatar')
+      .populate('sender', 'name email avatar role')
       .sort({ createdAt: -1 });
+
+    const safeNotifications = notifications.map((n) => {
+      const encrypted = encryptUserIds(n);
+      if (req.user?.role !== 'ADMIN') {
+        if (encrypted.sender && encrypted.sender.role === 'ADMIN') {
+          encrypted.sender.email = undefined;
+        }
+      }
+      return encrypted;
+    });
 
     res.status(200).json({
       message: 'Notifications fetched successfully',
-      notifications: notifications.map((n) => encryptUserIds(n)),
+      notifications: safeNotifications,
     });
   } catch (error) {
     res.status(500).json({ message: 'Error fetching notifications', error: error.message });
@@ -120,6 +130,19 @@ export const respondToInvitation = async (req, res) => {
             message: `Your request to join workspace "${board.title}" was approved!`,
           });
           await approvalNotification.save();
+        } else {
+          // Notify board owner that their invite was accepted
+          approvalNotification = new Notification({
+            recipient: board.createdBy,
+            sender: userId, // invited member
+            senderName: userName,
+            type: 'board_invite',
+            status: 'accepted',
+            boardId: board._id,
+            boardTitle: board.title,
+            message: `${userName} accepted your invitation to join workspace: "${board.title}"`,
+          });
+          await approvalNotification.save();
         }
 
         // Socket events for member added
@@ -142,13 +165,14 @@ export const respondToInvitation = async (req, res) => {
             boardId: encryptId(board._id),
             member: encryptedUser,
             board: encryptedBoard,
-            notification: approvalNotification ? encryptUserIds(approvalNotification) : undefined
+            notification: (approvalNotification && isAccessRequest) ? encryptUserIds(approvalNotification) : undefined
           });
 
-          // Also emit new notification to the added user's inbox
+          // Also emit new notification to the owner / recipient's inbox
           if (approvalNotification) {
-            emitToUser(targetUserId, 'invitationSent', {
-              recipientId: encryptId(targetUserId),
+            const recipientId = approvalNotification.recipient.toString();
+            emitToUser(recipientId, 'invitationSent', {
+              recipientId: encryptId(recipientId),
               notification: encryptUserIds(approvalNotification),
             });
           }
@@ -298,5 +322,36 @@ export const respondToInvitation = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Error responding to invitation', error: error.message });
+  }
+};
+
+// Mark notification as read
+export const markNotificationAsRead = async (req, res) => {
+  try {
+    const { notificationId } = req.params;
+    const userId = req.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(notificationId)) {
+      return res.status(400).json({ message: 'Invalid notification ID format' });
+    }
+
+    const notification = await Notification.findById(notificationId);
+    if (!notification) {
+      return res.status(404).json({ message: 'Notification not found' });
+    }
+
+    if (notification.recipient.toString() !== userId) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    notification.status = 'read';
+    await notification.save();
+
+    res.status(200).json({
+      message: 'Notification marked as read',
+      notification: encryptUserIds(notification),
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error marking notification as read', error: error.message });
   }
 };

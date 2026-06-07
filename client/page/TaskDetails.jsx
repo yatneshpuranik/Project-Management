@@ -132,7 +132,10 @@ const TaskDetails = () => {
   useEffect(() => {
     const handleCommentAdded = (data) => {
       if (data.taskId === taskId) {
-        setComments((prev) => [...prev, data.comment])
+        setComments((prev) => {
+          if (prev.some((c) => c._id === data.comment?._id)) return prev;
+          return [...prev, data.comment];
+        });
       }
     }
 
@@ -220,13 +223,11 @@ const TaskDetails = () => {
       const response = await axiosInstance.post(`/tasks/${taskId}/comments`, {
         text: commentText.trim(),
       })
-      setComments((prev) => [...prev, response.data.comment])
+      setComments((prev) => {
+        if (prev.some((c) => c._id === response.data.comment?._id)) return prev;
+        return [...prev, response.data.comment];
+      });
       setCommentText('')
-      socket.emit('comment-added', {
-        boardId,
-        taskId,
-        comment: response.data.comment,
-      })
     } catch (err) {
       console.error('Add comment failed', err)
       setError(

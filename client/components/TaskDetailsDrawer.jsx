@@ -366,13 +366,11 @@ const TaskDetailsDrawer = ({ taskId, boardId, isOpen, onClose }) => {
       const response = await axiosInstance.post(`/tasks/${taskId}/comments`, {
         text: commentText.trim(),
       });
-      setComments((prev) => [...prev, response.data.comment]);
-      setCommentText('');
-      socket.emit('comment-added', {
-        boardId,
-        taskId,
-        comment: response.data.comment,
+      setComments((prev) => {
+        if (prev.some((c) => c._id === response.data.comment?._id)) return prev;
+        return [...prev, response.data.comment];
       });
+      setCommentText('');
     } catch (err) {
       console.error('Failed to add comment:', err);
       toast.error('Failed to post comment');
@@ -458,7 +456,6 @@ const TaskDetailsDrawer = ({ taskId, boardId, isOpen, onClose }) => {
       setComments((prev) => prev.map((c) => c._id === commentId ? response.data.comment : c));
       setEditingCommentId(null);
       setEditingCommentText('');
-      socket.emit('comment-updated', { boardId, taskId, comment: response.data.comment });
       toast.success('Comment updated');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to edit comment');
@@ -470,7 +467,6 @@ const TaskDetailsDrawer = ({ taskId, boardId, isOpen, onClose }) => {
     try {
       await axiosInstance.delete(`/tasks/${taskId}/comments/${commentId}`);
       setComments((prev) => prev.filter((c) => c._id !== commentId));
-      socket.emit('comment-deleted', { boardId, taskId, commentId });
       toast.success('Comment deleted');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to delete comment');

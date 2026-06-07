@@ -1,5 +1,5 @@
 import express from 'express';
-import { getNotifications, respondToInvitation } from '../controller/notificationController.js';
+import { getNotifications, respondToInvitation, markNotificationAsRead } from '../controller/notificationController.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -8,5 +8,6 @@ router.use(authenticateToken);
 
 router.get('/', getNotifications);
 router.post('/:notificationId/respond', respondToInvitation);
+router.post('/:notificationId/read', markNotificationAsRead);
 
 export default router;

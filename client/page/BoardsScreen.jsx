@@ -525,7 +525,7 @@ const BoardsScreen = () => {
     const list = []
     members.forEach((m) => {
       const mId = (m._id || m).toString()
-      if (mId && !seen.has(mId)) {
+      if (mId && !seen.has(mId) && m.role !== 'ADMIN') {
         seen.add(mId)
         list.push(m)
       }
@@ -849,6 +849,7 @@ const BoardsScreen = () => {
                 <div className="relative">
                   <button
                     onClick={() => setIsInviteOpen(!isInviteOpen)}
+                    title="Invite Member"
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-xl text-xs transition cursor-pointer"
                   >
                     <HiOutlineUserAdd className="h-4 w-4" /> Invite Member
@@ -856,43 +857,43 @@ const BoardsScreen = () => {
 
                   {/* Discord Style invite dropdown */}
                   {isInviteOpen && (
-                    <div className="absolute right-0 mt-2 z-40 w-80 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl p-4 space-y-3">
-                      <div className="flex justify-between items-center">
-                        <h4 className="text-xs font-bold text-white uppercase">Invite teammate</h4>
-                        <button onClick={() => setIsInviteOpen(false)} className="text-slate-500 hover:text-slate-200">✕</button>
+                    <div className="absolute right-0 mt-2 z-40 w-85 bg-slate-950/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-4 space-y-3.5">
+                      <div className="flex justify-between items-center pb-2 border-b border-white/5">
+                        <h4 className="text-xs font-bold text-white uppercase tracking-wider">Invite teammate</h4>
+                        <button onClick={() => setIsInviteOpen(false)} className="text-slate-500 hover:text-slate-200 transition">✕</button>
                       </div>
                       <input
                         value={inviteSearch}
                         onChange={(e) => setInviteSearch(e.target.value)}
-                        placeholder="Search by name or email..."
-                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-white placeholder-slate-600 outline-none focus:border-sky-500"
+                        placeholder="Search by name, username or email..."
+                        className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 outline-none focus:border-sky-500 transition duration-200"
                       />
-                      <div className="max-h-48 overflow-y-auto space-y-1.5 custom-scrollbar pr-1">
+                      <div className="max-h-52 overflow-y-auto space-y-2 custom-scrollbar pr-1">
                         {isSearching ? (
-                          <div className="text-center py-4 text-[11px] text-slate-500">Searching...</div>
+                          <div className="text-center py-6 text-xs text-slate-500">Searching...</div>
                         ) : searchResults.length > 0 ? (
                           searchResults.map((user) => (
-                            <div key={user._id} className="flex justify-between items-center p-2 rounded-xl bg-slate-950/40 border border-white/5 text-[11px] gap-2">
-                              <div className="flex items-center gap-2 min-w-0">
+                            <div key={user._id} className="flex justify-between items-center p-2 rounded-xl bg-slate-900/40 border border-white/5 text-xs gap-3 hover:bg-white/5 transition">
+                              <div className="flex items-center gap-2.5 min-w-0">
                                 <img
                                   src={user.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name)}`}
                                   alt={user.name}
-                                  className="h-6 w-6 rounded-full flex-shrink-0 border border-white/10"
+                                  className="h-7 w-7 rounded-full flex-shrink-0 border border-white/10"
                                 />
                                 <div className="min-w-0">
                                   <div className="flex items-center gap-1.5">
                                     <span className="font-bold text-slate-200 truncate">{user.name}</span>
-                                    <span className="bg-slate-800 text-[8px] px-1 text-slate-400 rounded uppercase font-semibold">{user.role || 'USER'}</span>
+                                    <span className="bg-slate-800 text-[8px] px-1.5 py-0.5 rounded uppercase font-semibold text-slate-400">{user.role || 'USER'}</span>
                                   </div>
-                                  <p className="text-slate-500 text-[9px] truncate">{user.email}</p>
+                                  <p className="text-slate-500 text-[10px] truncate">{user.email}</p>
                                 </div>
                               </div>
                               {user.inviteStatus === 'pending' ? (
-                                <span className="bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded font-semibold text-[10px]">Pending</span>
+                                <span className="bg-amber-500/10 text-amber-400 px-2.5 py-1 rounded-xl font-semibold text-[10px]">Pending</span>
                               ) : (
                                 <button
                                   onClick={() => handleSendInvite(user._id)}
-                                  className="px-2.5 py-1 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-lg transition cursor-pointer"
+                                  className="px-3 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-xl transition text-[10px] cursor-pointer"
                                 >
                                   Invite
                                 </button>
@@ -900,9 +901,9 @@ const BoardsScreen = () => {
                             </div>
                           ))
                         ) : inviteSearch.trim() ? (
-                          <div className="text-center py-4 text-[11px] text-slate-500">No users found.</div>
+                          <div className="text-center py-6 text-xs text-slate-500">No users found.</div>
                         ) : (
-                          <div className="text-center py-4 text-[10px] text-slate-500">Type name or email to search.</div>
+                          <div className="text-center py-6 text-[11px] text-slate-500">Type name or email to search.</div>
                         )}
                       </div>
                     </div>

@@ -31,10 +31,10 @@ const AdminSidebar = () => {
   ];
 
   return (
-    <aside className="w-64 bg-slate-900/40 border-r border-white/10 p-4 flex flex-col justify-between flex-shrink-0">
-      <div className="space-y-1">
-        <p className="text-[9px] uppercase tracking-widest font-bold text-slate-500 px-3 mb-2">CONSOLE DIRECTORY</p>
-        <nav className="space-y-0.5">
+    <aside className="w-64 bg-slate-900/40 border-r border-white/10 p-5 flex flex-col justify-between flex-shrink-0">
+      <div className="space-y-2">
+        <p className="text-[10px] uppercase tracking-widest font-bold text-slate-500 px-3 mb-3">CONSOLE DIRECTORY</p>
+        <nav className="space-y-1.5">
           {sidebarItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -43,14 +43,14 @@ const AdminSidebar = () => {
                 to={item.path}
                 end={item.end}
                 className={({ isActive }) => 
-                  `w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition text-left ${
+                  `w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition text-left ${
                     isActive 
                       ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/10' 
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
                   }`
                 }
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="h-4.5 w-4.5" />
                 <span>{item.label}</span>
               </NavLink>
             );

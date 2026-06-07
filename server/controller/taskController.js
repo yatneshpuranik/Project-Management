@@ -370,6 +370,7 @@ export const updateTask = async (req, res) => {
       task.dueDate = updates.dueDate || undefined;
       task.deadline = updates.dueDate || undefined;
     }
+    const originalStatus = task.status;
 
     // Update remaining allowed fields
     const allowedFields = ['title', 'description', 'priority', 'status', 'progress', 'openContribution'];
@@ -386,7 +387,30 @@ export const updateTask = async (req, res) => {
     await task.save();
     await task.populate(['assignedTo', 'createdBy', 'collaborators']);
 
-    // Create Activity
+    // Check if task is completed
+    if (task.status === 'Done' && originalStatus !== 'Done') {
+      if (board.createdBy.toString() !== userId) {
+        const complNotif = new Notification({
+          recipient: board.createdBy,
+          sender: userId,
+          senderName: req.userName || 'Member',
+          type: 'task_completed',
+          status: 'unread',
+          boardId: task.boardId,
+          boardTitle: board.title,
+          taskId: task._id,
+          taskTitle: task.title,
+          message: `${req.userName || 'Member'} completed the task: "${task.title}"`,
+        });
+        await complNotif.save();
+        try {
+          emitToUser(board.createdBy.toString(), 'invitationSent', {
+            recipientId: encryptId(board.createdBy),
+            notification: encryptUserIds(complNotif)
+          });
+        } catch (e) {}
+      }
+    }    // Create Activity
     await createActivity({
       boardId: task.boardId,
       taskId: task._id,
@@ -434,6 +458,31 @@ export const moveTask = async (req, res) => {
 
     await task.save();
     await task.populate(['assignedTo', 'createdBy']);
+
+    // Check if task is completed
+    if (task.status === 'Done' && oldStatus !== 'Done') {
+      if (board.createdBy.toString() !== userId) {
+        const complNotif = new Notification({
+          recipient: board.createdBy,
+          sender: userId,
+          senderName: req.userName || 'Member',
+          type: 'task_completed',
+          status: 'unread',
+          boardId: task.boardId,
+          boardTitle: board.title,
+          taskId: task._id,
+          taskTitle: task.title,
+          message: `${req.userName || 'Member'} completed the task: "${task.title}"`,
+        });
+        await complNotif.save();
+        try {
+          emitToUser(board.createdBy.toString(), 'invitationSent', {
+            recipientId: encryptId(board.createdBy),
+            notification: encryptUserIds(complNotif)
+          });
+        } catch (e) {}
+      }
+    }
 
     // Create Activity
     await createActivity({

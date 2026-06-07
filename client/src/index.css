@@ -62,3 +62,95 @@ select {
     @apply inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10;
   }
 } */
+
+/* Desktop-First Premium Readability Adjustments */
+@media (min-width: 1024px) {
+  /* Increase global base size */
+  :root {
+    font-size: 15px;
+  }
+
+  /* Standardize input heights and sizes */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input:not([type]),
+  textarea,
+  select {
+    padding-top: 0.65rem !important;
+    padding-bottom: 0.65rem !important;
+    height: 2.85rem !important; /* Standardize desktop input height to ~45px */
+    font-size: 0.9rem !important; /* Scale font size slightly */
+    border-radius: 0.75rem !important;
+  }
+
+  textarea {
+    height: auto !important;
+  }
+
+  /* Scale default button sizes and padding */
+  button:not([id="notification-bell"]):not(.p-1):not(\.p-1\.5):not(.p-2):not(\.p-0\.5):not(.h-7):not(.h-10):not(.h-9):not(.h-8) {
+    padding-top: 0.65rem !important;
+    padding-bottom: 0.65rem !important;
+    padding-left: 1.35rem !important;
+    padding-right: 1.35rem !important;
+    font-size: 0.9rem !important;
+    border-radius: 0.75rem !important;
+  }
+
+  /* Increase padding in content cards and panels */
+  .p-4.rounded-2xl,
+  .p-5.rounded-2xl,
+  .p-6.rounded-2xl {
+    padding: 1.6rem !important; /* Upgrade card padding */
+  }
+
+  .p-5.rounded-3xl,
+  .p-6.rounded-3xl {
+    padding: 1.85rem !important;
+  }
+
+  /* Sidebar item padding and spacing upgrades */
+  aside nav.\.space-y-1\.5 a,
+  aside nav.\.space-y-0\.5 a,
+  nav.space-y-1 a,
+  nav.\.space-y-0\.5 a {
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+    font-size: 0.9rem !important; /* Align font size */
+  }
+
+  /* Spacing rules for navigation lists */
+  nav.space-y-1,
+  nav.\.space-y-1\.5,
+  nav.\.space-y-0\.5 {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem !important; /* Increase gap between vertical list items */
+  }
+
+  /* Table and list row items readability */
+  .cursor-pointer.rounded-2xl.p-4,
+  .cursor-pointer.rounded-2xl.p-3 {
+    padding: 1.2rem 1.4rem !important; /* Increase padding in tables/lists */
+  }
+
+  /* Sizing classes overrides */
+  .text-xs {
+    font-size: 0.85rem !important; /* Scale text-xs to ~13.5px */
+  }
+
+  .text-\[10px\] {
+    font-size: 0.775rem !important; /* Scale text-[10px] to ~12px */
+  }
+
+  .text-\[9px\] {
+    font-size: 0.75rem !important; /* Scale text-[9px] to ~11.5px */
+  }
+
+  .text-\[8px\] {
+    font-size: 0.7rem !important; /* Scale text-[8px] to ~10.5px */
+    padding: 0.2rem 0.5rem !important;
+  }
+}

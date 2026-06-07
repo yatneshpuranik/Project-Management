@@ -6,7 +6,7 @@ import { setUser } from '../redux/userSlice.js';
 import { fetchTasksByBoard } from '../redux/taskSlice.js';
 import { fetchBoards } from '../redux/boardSlice.js';
 import socket from '../utils/socket.js';
-import { HiOutlineBell, HiOutlineViewBoards, HiOutlineMenu } from 'react-icons/hi';
+import { HiOutlineBell, HiOutlineViewBoards, HiOutlineMenu, HiOutlineUser, HiOutlineCog, HiOutlineLockClosed, HiOutlineLogout } from 'react-icons/hi';
 import { toast } from '../utils/toast.js';
 
 const Navbar = ({ toggleSidebar }) => {
@@ -20,7 +20,9 @@ const Navbar = ({ toggleSidebar }) => {
   const [userNotifications, setUserNotifications] = useState([]);
   const [activeTab, setActiveTab] = useState('inbox'); // 'inbox' or 'feed'
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const notificationRef = useRef(null);
+  const profileRef = useRef(null);
 
   const fetchInboxNotifications = async () => {
     try {
@@ -150,6 +152,9 @@ const Navbar = ({ toggleSidebar }) => {
       if (notificationRef.current && !notificationRef.current.contains(e.target)) {
         setIsNotificationsOpen(false);
       }
+      if (profileRef.current && !profileRef.current.contains(e.target)) {
+        setIsProfileOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
@@ -201,7 +206,32 @@ const Navbar = ({ toggleSidebar }) => {
   };
 
   const pendingCount = userNotifications.filter((n) => n.status === 'pending').length;
-  const totalUnreadCount = pendingCount + notifications.length;
+  const totalUnreadCount = userNotifications.filter((n) => n.status === 'pending' || n.status === 'unread').length;
+
+  const handleNotificationClick = async (notif) => {
+    setIsNotificationsOpen(false);
+
+    // Mark as read if unread on the backend
+    if (notif.status === 'unread') {
+      try {
+        await axiosInstance.post(`/notifications/${notif._id}/read`);
+        setUserNotifications((prev) =>
+          prev.map((n) => (n._id === notif._id ? { ...n, status: 'read' } : n))
+        );
+      } catch (err) {
+        console.error('Failed to mark notification as read:', err);
+      }
+    }
+
+    // Navigate to page
+    if (notif.taskId && notif.boardId) {
+      navigate(`/boards/${notif.boardId}/tasks/${notif.taskId}`);
+    } else if (notif.boardId) {
+      navigate(`/boards/${notif.boardId}`);
+    } else if (notif.type === 'role_change') {
+      navigate('/profile');
+    }
+  };
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/95 backdrop-blur-xl shadow-xl shadow-black/20 h-[73px] flex items-center">
@@ -290,7 +320,8 @@ const Navbar = ({ toggleSidebar }) => {
                         return (
                           <div
                             key={notif._id}
-                            className="rounded-xl bg-slate-950/60 p-3 border border-white/5 text-xs text-slate-300 leading-normal"
+                            onClick={() => handleNotificationClick(notif)}
+                            className="rounded-xl bg-slate-950/60 p-3 border border-white/5 text-xs text-slate-300 leading-normal cursor-pointer hover:bg-slate-900 hover:border-white/10 transition"
                           >
                             <div className="flex justify-between items-start gap-1">
                               <p className="font-semibold text-white">
@@ -349,17 +380,19 @@ const Navbar = ({ toggleSidebar }) => {
                             {isPendingInvite && (
                               <div className="flex gap-2 mt-3 pt-2 border-t border-white/5">
                                 <button
-                                  onClick={() =>
-                                    handleRespondInvitation(notif._id, 'accept', notif.taskId, notif.boardId)
-                                  }
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRespondInvitation(notif._id, 'accept', notif.taskId, notif.boardId);
+                                  }}
                                   className="flex-1 py-1 rounded bg-sky-500 hover:bg-sky-400 text-white font-semibold text-[10px] transition cursor-pointer"
                                 >
                                   Accept
                                 </button>
                                 <button
-                                  onClick={() =>
-                                    handleRespondInvitation(notif._id, 'reject', notif.taskId, notif.boardId)
-                                  }
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRespondInvitation(notif._id, 'reject', notif.taskId, notif.boardId);
+                                  }}
                                   className="flex-1 py-1 rounded bg-white/5 hover:bg-white/10 text-slate-300 font-semibold text-[10px] transition cursor-pointer"
                                 >
                                   Reject
@@ -399,23 +432,72 @@ const Navbar = ({ toggleSidebar }) => {
           
           {user ? (
             <>
-              <div 
-                className="flex cursor-pointer items-center gap-2 rounded-2xl border border-white/10 bg-slate-900 px-3 py-1.5 transition hover:bg-slate-800" 
-                onClick={() => navigate('/profile')}
-              >
-                <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-sky-500 to-blue-600 text-white text-xs font-bold">
-                  {(user?.name || userName)?.charAt(0) || 'U'}
-                </span>
-                <div className="hidden sm:block text-left">
-                  <p className="text-xs font-semibold text-white">{user?.name || userName || 'User'}</p>
+              <div className="relative" ref={profileRef}>
+                <div 
+                  className="flex cursor-pointer items-center gap-2 rounded-2xl border border-white/10 bg-slate-900 px-3 py-1.5 transition hover:bg-slate-800" 
+                  onClick={() => setIsProfileOpen(!isProfileOpen)}
+                >
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-sky-500 to-blue-600 text-white text-xs font-bold">
+                    {(user?.name || userName)?.charAt(0) || 'U'}
+                  </span>
+                  <div className="hidden sm:block text-left">
+                    <p className="text-xs font-semibold text-white">{user?.name || userName || 'User'}</p>
+                  </div>
                 </div>
+
+                {isProfileOpen && (
+                  <div className="absolute right-0 mt-2 z-50 w-64 rounded-2xl border border-white/10 bg-slate-950 p-4 shadow-2xl text-left">
+                    <div className="px-1 py-2">
+                      <p className="text-sm font-bold text-white leading-tight">{user?.name || userName || 'User'}</p>
+                      <p className="text-xs text-slate-400 mt-1 truncate">{user?.email || localStorage.getItem('userEmail') || ''}</p>
+                    </div>
+                    <div className="my-2 border-t border-white/10" />
+                    <div className="space-y-1">
+                      <button
+                        onClick={() => {
+                          setIsProfileOpen(false);
+                          navigate('/profile');
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition text-left"
+                      >
+                        <HiOutlineUser className="h-4.5 w-4.5 text-slate-400" />
+                        <span>Profile</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsProfileOpen(false);
+                          navigate('/settings');
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition text-left"
+                      >
+                        <HiOutlineCog className="h-4.5 w-4.5 text-slate-400" />
+                        <span>Settings</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsProfileOpen(false);
+                          navigate('/profile');
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition text-left"
+                      >
+                        <HiOutlineLockClosed className="h-4.5 w-4.5 text-slate-400" />
+                        <span>Security</span>
+                      </button>
+                      <div className="my-2 border-t border-white/10" />
+                      <button
+                        onClick={() => {
+                          setIsProfileOpen(false);
+                          handleLogout();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-rose-400 hover:text-white hover:bg-rose-500/10 rounded-xl transition text-left"
+                      >
+                        <HiOutlineLogout className="h-4.5 w-4.5 text-rose-400" />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-              <button
-                onClick={handleLogout}
-                className="hidden rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/20 md:inline-flex"
-              >
-                Sign out
-              </button>
             </>
           ) : (
             <button

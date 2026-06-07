@@ -128,7 +128,10 @@ export const getBoardAnalytics = async (req, res) => {
 
     // MEMBER ANALYTICS
     const memberIds = [board.createdBy.toString(), ...board.members.map(m => m.toString())];
-    const users = await User.find({ _id: { $in: memberIds } }).select('name email role avatar presenceStatus lastActive');
+    let users = await User.find({ _id: { $in: memberIds } }).select('name email role avatar presenceStatus lastActive');
+    if (req.user?.role !== 'ADMIN') {
+      users = users.filter((u) => u.role !== 'ADMIN');
+    }
 
     const memberAnalytics = users.map(user => {
       const uId = user._id.toString();

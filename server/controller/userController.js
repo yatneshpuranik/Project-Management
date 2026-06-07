@@ -165,6 +165,8 @@ export const getAllUsers = async (req, res) => {
     try {
         const userId = req.userId;
         const { boardId, taskId } = req.query;
+        const currentRole = req.user?.role;
+        const isAdminRequester = currentRole === 'ADMIN';
 
         if (boardId) {
             if (!mongoose.Types.ObjectId.isValid(boardId)) {
@@ -175,10 +177,13 @@ export const getAllUsers = async (req, res) => {
                 return res.status(404).json({ message: 'Board not found' });
             }
             const isMember = board.createdBy._id.toString() === userId || board.members.some(m => m._id.toString() === userId);
-            if (!isMember) {
+            if (!isMember && !isAdminRequester) {
                 return res.status(403).json({ message: 'Unauthorized access' });
             }
-            const membersList = [board.createdBy, ...board.members];
+            let membersList = [board.createdBy, ...board.members].filter(Boolean);
+            if (!isAdminRequester) {
+                membersList = membersList.filter(m => m.role !== 'ADMIN');
+            }
             const uniqueMembers = Array.from(new Map(membersList.map(m => [m._id.toString(), m])).values());
             return res.status(200).json({
                 message: "Board members retrieved successfully",
@@ -199,11 +204,15 @@ export const getAllUsers = async (req, res) => {
                 return res.status(404).json({ message: 'Board not found' });
             }
             const isMember = board.createdBy.toString() === userId || board.members.some(m => m.toString() === userId);
-            if (!isMember) {
+            if (!isMember && !isAdminRequester) {
                 return res.status(403).json({ message: 'Unauthorized access' });
             }
-            const collabsList = [...(task.collaborators || [])];
+            let collabsList = [...(task.collaborators || [])];
             if (task.assignedTo) collabsList.push(task.assignedTo);
+            collabsList = collabsList.filter(Boolean);
+            if (!isAdminRequester) {
+                collabsList = collabsList.filter(c => c.role !== 'ADMIN');
+            }
             const uniqueCollabs = Array.from(new Map(collabsList.map(c => [c._id.toString(), c])).values());
             return res.status(200).json({
                 message: "Task collaborators retrieved successfully",
@@ -233,7 +242,11 @@ export const getAllUsers = async (req, res) => {
         });
 
         const allowedUserIds = Array.from(new Set([...memberUserIds, ...collaboratorUserIds]));
-        const users = await User.find({ _id: { $in: allowedUserIds } }).select('-password');
+        const query = { _id: { $in: allowedUserIds } };
+        if (!isAdminRequester) {
+            query.role = { $ne: 'ADMIN' };
+        }
+        const users = await User.find(query).select('-password');
 
         return res.status(200).json({
             message: "Users retrieved successfully",
@@ -408,7 +421,8 @@ export const unblockUser = async (req, res) => {
 
 export const searchUsers = async (req, res) => {
     try {
-        const { q, boardId } = req.query;
+        const { q } = req.query;
+        const boardId = req.query.boardId ? decryptId(req.query.boardId) : undefined;
         if (!q || !q.trim()) {
             return res.status(200).json({
                 success: true,
@@ -433,35 +447,38 @@ export const searchUsers = async (req, res) => {
                     board.members.forEach(m => excludeIds.push(m.toString()));
                 }
             }
+
+            // Exclude pending board invites
+            const pendingInvites = await Notification.find({
+                boardId,
+                type: 'board_invite',
+                status: 'pending'
+            });
+            pendingInvites.forEach(n => excludeIds.push(n.recipient.toString()));
         }
 
-        const users = await User.find({
+        const queryCond = {
             _id: { $nin: excludeIds },
             isBlocked: { $ne: true },
             $or: [
                 { name: { $regex: searchQuery, $options: 'i' } },
                 { email: { $regex: searchQuery, $options: 'i' } }
             ]
-        })
+        };
+
+        // Exclude admins from the search if requester is not ADMIN
+        if (req.user?.role !== 'ADMIN') {
+            queryCond.role = { $ne: 'ADMIN' };
+        }
+
+        const users = await User.find(queryCond)
         .select('name email role avatar')
         .limit(10);
-
-        // Fetch pending invites for these users to set inviteStatus dynamically
-        let pendingUserIds = new Set();
-        if (boardId && users.length > 0) {
-            const pendingInvites = await Notification.find({
-                recipient: { $in: users.map(u => u._id) },
-                boardId,
-                type: 'board_invite',
-                status: 'pending'
-            });
-            pendingUserIds = new Set(pendingInvites.map(n => n.recipient.toString()));
-        }
 
         const safeUsers = users.map(user => {
             const u = user.toObject();
             const encryptedUser = encryptUserIds(u);
-            encryptedUser.inviteStatus = pendingUserIds.has(user._id.toString()) ? 'pending' : 'none';
+            encryptedUser.inviteStatus = 'none'; // already filtered out pendings, so it is always none
             encryptedUser.avatar = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name)}`;
             return encryptedUser;
         });
@@ -498,6 +515,27 @@ export const promoteUser = async (req, res) => {
         user.role = 'ADMIN';
         await user.save();
 
+        // Create notification
+        try {
+            const Notification = mongoose.model('Notification');
+            const notif = new Notification({
+                recipient: userId,
+                sender: req.userId,
+                senderName: req.userName || 'Admin',
+                type: 'role_change',
+                status: 'unread',
+                message: `Your platform role was changed to ADMIN by the administrator`,
+            });
+            await notif.save();
+            const { emitToUser } = await import('../socket/socket.js');
+            emitToUser(userId, 'invitationSent', {
+                recipientId: encryptId(userId),
+                notification: encryptUserIds(notif)
+            });
+        } catch (e) {
+            console.error('Error creating promotion notification:', e);
+        }
+
         return res.status(200).json({
             success: true,
             message: 'User promoted to Admin successfully',
@@ -530,6 +568,27 @@ export const demoteUser = async (req, res) => {
 
         user.role = 'USER';
         await user.save();
+
+        // Create notification
+        try {
+            const Notification = mongoose.model('Notification');
+            const notif = new Notification({
+                recipient: userId,
+                sender: req.userId,
+                senderName: req.userName || 'Admin',
+                type: 'role_change',
+                status: 'unread',
+                message: `Your platform role was changed to USER by the administrator`,
+            });
+            await notif.save();
+            const { emitToUser } = await import('../socket/socket.js');
+            emitToUser(userId, 'invitationSent', {
+                recipientId: encryptId(userId),
+                notification: encryptUserIds(notif)
+            });
+        } catch (e) {
+            console.error('Error creating demotion notification:', e);
+        }
 
         return res.status(200).json({
             success: true,
