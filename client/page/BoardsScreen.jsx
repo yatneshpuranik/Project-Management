@@ -19,7 +19,7 @@ import { HiOutlineClock, HiOutlinePlus, HiOutlineUserAdd, HiOutlineFolder, HiOut
 const BoardsScreen = () => {
   const dispatch = useDispatch()
   const navigate = useNavigate()
-  const { boardId } = useParams()
+  const { boardId, taskId } = useParams()
   const { boards, currentBoard } = useSelector((state) => state.boards)
   const { tasks, onlineUsers } = useSelector((state) => state.tasks)
   const currentUserId = localStorage.getItem('userId');
