@@ -6,6 +6,7 @@ const router = express.Router();
 
 router.post("/register", createUser);
 router.post("/login", loginUser);
+
 router.use(authenticateToken);
 router.get("/me", getCurrentUser);
 router.put("/profile", updateProfile);
