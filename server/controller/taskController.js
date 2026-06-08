@@ -295,10 +295,11 @@ export const updateTask = async (req, res) => {
     }
 
     const board = await Board.findById(task.boardId);
-    const isOwner = (board.createdBy?._id || board.createdBy || '').toString() === userId;
-    const isMember = isOwner || board.members.some((member) => (member?._id || member || '').toString() === userId);
+    const isAdmin = req.user?.role === 'ADMIN';
+    const isOwner = (board?.createdBy?._id || board?.createdBy || '').toString() === userId;
+    const isMember = isOwner || board?.members.some((member) => (member?._id || member || '').toString() === userId);
 
-    if (!isMember) {
+    if (!isMember && !isAdmin) {
       return res.status(403).json({ message: 'Unauthorized access' });
     }
 
@@ -329,9 +330,26 @@ export const updateTask = async (req, res) => {
     // Check if openContribution is being changed
     const isContributionChanged = updates.openContribution !== undefined && updates.openContribution !== task.openContribution;
 
-    // Enforce owner role check
-    if ((isAssigneeChanged || isDeadlineChanged || isContributionChanged) && !isOwner) {
-      return res.status(403).json({ message: 'Only the workspace owner can assign tasks, edit deadlines, or modify contributor mode' });
+    // Check if status is being changed
+    const isStatusChanged = updates.status !== undefined && updates.status !== task.status;
+
+    // Enforce dynamic permission checks
+    if (isAssigneeChanged) {
+      const hasAssignPerm = await checkPermission(userId, task.boardId, 'canAssignTasks');
+      if (!hasAssignPerm && newAssignee !== userId && newAssignee !== '') {
+        return res.status(403).json({ message: 'Only authorized roles can assign tasks to other members' });
+      }
+    }
+
+    if (isStatusChanged) {
+      const hasMovePerm = await checkPermission(userId, task.boardId, 'canMoveTasks');
+      if (!hasMovePerm) {
+        return res.status(403).json({ message: 'Only authorized roles can move tasks in this workspace' });
+      }
+    }
+
+    if ((isDeadlineChanged || isContributionChanged) && !isOwner && !isAdmin) {
+      return res.status(403).json({ message: 'Only the workspace owner or admin can edit deadlines or modify contributor mode' });
     }
 
     // Handle assignment/unassignment events
@@ -464,6 +482,16 @@ export const updateTask = async (req, res) => {
       message: `${req.userName || 'Owner'} updated task: "${task.title}"`,
     });
 
+    // Emit live task update
+    try {
+      const io = getIo();
+      if (io) {
+        io.to(`board-${task.boardId.toString()}`).emit('task-updated', { task: encryptUserIds(task) });
+      }
+    } catch (socketErr) {
+      console.error('Socket task-updated emit error:', socketErr);
+    }
+
     res.status(200).json({
       message: 'Task updated successfully',
       task: encryptUserIds(task),
@@ -490,8 +518,14 @@ export const moveTask = async (req, res) => {
     }
 
     const board = await Board.findById(task.boardId);
-    if (!board || !isBoardMember(board, userId)) {
+    const isAdmin = req.user?.role === 'ADMIN';
+    if (!isAdmin && (!board || !isBoardMember(board, userId))) {
       return res.status(403).json({ message: 'Unauthorized access' });
+    }
+
+    const hasMovePerm = await checkPermission(userId, task.boardId, 'canMoveTasks');
+    if (!hasMovePerm) {
+      return res.status(403).json({ message: 'Only authorized roles can move tasks in this workspace' });
     }
 
     const oldStatus = task.status;
@@ -537,6 +571,20 @@ export const moveTask = async (req, res) => {
       type: 'Task Moved',
       message: `${req.userName || 'Owner'} moved task "${task.title}" from ${oldStatus} to ${status}`,
     });
+
+    // Emit live task-moved socket event
+    try {
+      const io = getIo();
+      if (io) {
+        io.to(`board-${task.boardId.toString()}`).emit('task-moved', {
+          task: encryptUserIds(task),
+          fromStatus: oldStatus,
+          toStatus: status
+        });
+      }
+    } catch (socketErr) {
+      console.error('Socket task-moved emit error:', socketErr);
+    }
 
     res.status(200).json({
       message: 'Task moved successfully',
@@ -675,13 +723,14 @@ export const inviteToTask = async (req, res) => {
 // COMMENTS MANAGEMENT
 
 // Get comments for task
+// Get comments for task
 export const getComments = async (req, res) => {
   try {
     const { taskId } = req.params;
     if (!mongoose.Types.ObjectId.isValid(taskId)) {
       return res.status(400).json({ message: 'Invalid task ID format' });
     }
-    const task = await Task.findById(taskId).populate('comments.userId', 'name email avatar');
+    const task = await Task.findById(taskId).populate('comments.userId', 'name email avatar role');
     if (!task) {
       return res.status(404).json({ message: 'Task not found' });
     }
@@ -690,9 +739,48 @@ export const getComments = async (req, res) => {
     if (!isBoardMember(board, req.userId) && !isAdmin) {
       return res.status(403).json({ message: 'Unauthorized access' });
     }
+
+    const allComments = task.comments || [];
+    
+    // Separate root comments and replies
+    const rootComments = allComments.filter(c => !c.parentId);
+    const replies = allComments.filter(c => c.parentId);
+
+    // Sort root comments newest first
+    rootComments.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    // Sort replies oldest first
+    replies.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+    // Pagination
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const skip = parseInt(req.query.skip, 10) || 0;
+    const paginatedRoots = rootComments.slice(skip, skip + limit);
+
+    // Gather descendants
+    const getDescendants = (parentIds) => {
+      const descendants = [];
+      let currentParentIds = [...parentIds];
+      
+      while (currentParentIds.length > 0) {
+        const children = replies.filter(r => r.parentId && currentParentIds.includes(r.parentId.toString()));
+        if (children.length === 0) break;
+        descendants.push(...children);
+        currentParentIds = children.map(c => c._id.toString());
+      }
+      return descendants;
+    };
+
+    const rootIds = paginatedRoots.map(r => r._id.toString());
+    const descendantReplies = getDescendants(rootIds);
+
+    const finalComments = [...paginatedRoots, ...descendantReplies];
+
     res.status(200).json({
       message: 'Comments fetched successfully',
-      comments: encryptUserIds(task.comments),
+      comments: encryptUserIds(finalComments),
+      totalRootsCount: rootComments.length,
+      hasMore: rootComments.length > (skip + limit),
     });
   } catch (error) {
     res.status(500).json({ message: 'Error fetching comments', error: error.message });
@@ -703,7 +791,7 @@ export const getComments = async (req, res) => {
 export const addComment = async (req, res) => {
   try {
     const { taskId } = req.params;
-    const { text } = req.body;
+    const { text, parentId } = req.body;
     const userId = req.userId;
 
     if (!mongoose.Types.ObjectId.isValid(taskId)) {
@@ -719,7 +807,8 @@ export const addComment = async (req, res) => {
       return res.status(404).json({ message: 'Task not found' });
     }
     const board = await Board.findById(task.boardId);
-    if (!board || !isBoardMember(board, userId)) {
+    const isAdmin = req.user?.role === 'ADMIN';
+    if (!isAdmin && (!board || !isBoardMember(board, userId))) {
       return res.status(403).json({ message: 'Unauthorized access' });
     }
 
@@ -727,6 +816,7 @@ export const addComment = async (req, res) => {
       userId,
       userName: req.userName || 'Member',
       text: text.trim(),
+      parentId: parentId || undefined,
       createdAt: new Date(),
     };
 
@@ -734,7 +824,7 @@ export const addComment = async (req, res) => {
     await task.save();
 
     // Populate user
-    const savedTask = await Task.findById(taskId).populate('comments.userId', 'name email avatar');
+    const savedTask = await Task.findById(taskId).populate('comments.userId', 'name email avatar role');
     const comment = savedTask.comments[savedTask.comments.length - 1];
 
     await createActivity({

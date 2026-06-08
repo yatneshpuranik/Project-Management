@@ -188,7 +188,7 @@ export const updatePermission = async (req, res) => {
     const { role } = req.params;
     const updates = req.body;
     
-    const permission = await Permission.findOneAndUpdate({ role }, updates, { new: true });
+    const permission = await Permission.findOneAndUpdate({ role }, updates, { returnDocument: 'after' });
     if (!permission) {
       return res.status(404).json({ success: false, message: 'Role not found' });
     }

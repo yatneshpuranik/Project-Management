@@ -1,21 +1,34 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import axiosInstance from '../../../utils/axiosInstance';
 import { toast } from '../../../utils/toast';
 import UsersTable from '../../components/admin/users/UsersTable';
 import UserDetailsModal from '../../components/admin/users/UserDetailsModal';
 
 const AdminUsers = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [selectedUserDetails, setSelectedUserDetails] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const userQuery = searchParams.get('q') || '';
 
   const fetchUsers = async () => {
     try {
       const res = await axiosInstance.get('/admin/users');
-      setUsers(res.data.users || []);
+      const list = res.data.users || [];
+      setUsers(list);
+
+      // Handle auto-select via query param
+      const activeUserId = searchParams.get('userId');
+      if (activeUserId && list.length > 0) {
+        const matched = list.find((u) => u._id === activeUserId);
+        if (matched) {
+          setSelectedUser(matched);
+          fetchFullUserDetails(activeUserId);
+        }
+      }
     } catch (e) {
       console.error(e);
       toast.error('Failed to load users directory');
@@ -24,9 +37,29 @@ const AdminUsers = () => {
     }
   };
 
+  const fetchFullUserDetails = async (userId) => {
+    try {
+      const res = await axiosInstance.get(`/admin/users/${userId}`);
+      setSelectedUserDetails(res.data);
+    } catch (err) {
+      console.error('Failed to fetch full user details:', err);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [searchParams]);
+
+  const handleSelectUser = (user) => {
+    if (!user) {
+      setSelectedUser(null);
+      setSelectedUserDetails(null);
+      return;
+    }
+    setSelectedUser(user);
+    setSelectedUserDetails(null); // Clear previous details while loading
+    fetchFullUserDetails(user._id);
+  };
 
   const handleUpdateRole = async (userId, role) => {
     try {
@@ -35,6 +68,7 @@ const AdminUsers = () => {
       fetchUsers();
       if (selectedUser?._id === userId) {
         setSelectedUser((prev) => ({ ...prev, role }));
+        fetchFullUserDetails(userId);
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to update role');
@@ -50,6 +84,7 @@ const AdminUsers = () => {
       fetchUsers();
       if (selectedUser?._id === userId) {
         setSelectedUser((prev) => ({ ...prev, isBlocked, reason }));
+        fetchFullUserDetails(userId);
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to toggle block state');
@@ -80,6 +115,7 @@ const AdminUsers = () => {
       await axiosInstance.delete(`/admin/users/${userId}`);
       toast.success('User deleted permanently.');
       setSelectedUser(null);
+      setSelectedUserDetails(null);
       fetchUsers();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to delete user');
@@ -93,7 +129,7 @@ const AdminUsers = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 text-slate-100">
+      <div className="flex items-center justify-center py-20 text-slate-100 font-sans">
         <span className="h-6 w-6 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin mr-3" />
         Loading users...
       </div>
@@ -101,7 +137,7 @@ const AdminUsers = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans">
       <div className="flex items-center justify-between border-b border-white/10 pb-4">
         <div>
           <h2 className="text-xl font-bold text-white">Users Moderation</h2>
@@ -120,13 +156,14 @@ const AdminUsers = () => {
           <UsersTable
             users={filteredUsersList}
             selectedUser={selectedUser}
-            onSelectUser={setSelectedUser}
+            onSelectUser={handleSelectUser}
           />
         </div>
 
         <div className="bg-slate-900/30 border border-white/10 rounded-2xl p-5">
           <UserDetailsModal
             selectedUser={selectedUser}
+            selectedUserDetails={selectedUserDetails}
             onBlockToggle={handleBlockUserToggle}
             onForceLogout={handleForceLogout}
             onResetAccess={handleResetAccess}

@@ -6,7 +6,7 @@ import { setUser } from '../redux/userSlice.js';
 import { fetchTasksByBoard } from '../redux/taskSlice.js';
 import { fetchBoards } from '../redux/boardSlice.js';
 import socket from '../utils/socket.js';
-import { HiOutlineBell, HiOutlineViewBoards, HiOutlineMenu, HiOutlineUser, HiOutlineCog, HiOutlineLockClosed, HiOutlineLogout } from 'react-icons/hi';
+import { HiOutlineBell, HiOutlineViewBoards, HiOutlineMenu, HiOutlineUser, HiOutlineCog, HiOutlineLockClosed, HiOutlineLogout, HiOutlineSearch } from 'react-icons/hi';
 import { toast } from '../utils/toast.js';
 
 const Navbar = ({ toggleSidebar }) => {
@@ -23,6 +23,43 @@ const Navbar = ({ toggleSidebar }) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const notificationRef = useRef(null);
   const profileRef = useRef(null);
+
+  // Global Search states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState(null);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const searchRef = useRef(null);
+
+  useEffect(() => {
+    const delayDebounce = setTimeout(async () => {
+      if (!searchQuery.trim()) {
+        setSearchResults(null);
+        return;
+      }
+      setSearching(true);
+      try {
+        const res = await axiosInstance.get(`/search/global?q=${encodeURIComponent(searchQuery)}`);
+        setSearchResults(res.data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounce);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchRef.current && !searchRef.current.contains(e.target)) {
+        setIsSearchFocused(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const fetchInboxNotifications = async () => {
     try {
@@ -253,21 +290,134 @@ const Navbar = ({ toggleSidebar }) => {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-lg shadow-sky-500/20 group-hover:scale-105 transition">
               <HiOutlineViewBoards className="h-5 w-5" />
             </div>
-            <div>
-              <p className="text-[10px] font-medium uppercase tracking-[0.24em] text-slate-400">Workspace</p>
-              <h1 className="text-sm font-semibold text-white leading-none mt-1">{activeBoardName}</h1>
-              {currentBoard && (
-                <p className="text-[9px] text-sky-400 font-semibold mt-1">
-                  Owner: {currentBoard.createdBy?.name || 'Unknown'}
-                </p>
-              )}
-            </div>
+            {user ? (
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-[0.24em] text-slate-400">Workspace</p>
+                <h1 className="text-sm font-semibold text-white leading-none mt-1">{activeBoardName}</h1>
+                {currentBoard && (
+                  <p className="text-[9px] text-sky-400 font-semibold mt-1">
+                    Owner: {currentBoard.createdBy?.name || 'Unknown'}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-[0.24em] text-slate-400">Platform</p>
+                <h1 className="text-sm font-semibold text-white leading-none mt-1">Kanban Board</h1>
+              </div>
+            )}
           </Link>
         </div>
 
+        {/* Global Search Bar */}
+        {user && (
+          <div className="hidden md:flex flex-1 max-w-md mx-6 relative" ref={searchRef}>
+            <div className="w-full flex items-center gap-2 bg-slate-900 border border-white/10 rounded-xl px-3 py-1.5 focus-within:border-sky-500 transition">
+              <HiOutlineSearch className="h-4 w-4 text-slate-500" />
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setIsSearchFocused(true)}
+                placeholder="Search workspaces, tasks, channels..."
+                className="bg-transparent border-none outline-none text-xs text-white placeholder-slate-650 w-full"
+              />
+            </div>
+
+            {/* Search Dropdown Overlay */}
+            {isSearchFocused && searchQuery.trim() && (
+              <div className="absolute top-full left-0 right-0 mt-2 z-50 w-full rounded-2xl border border-white/10 bg-slate-950 p-4 shadow-2xl max-h-96 overflow-y-auto custom-scrollbar text-xs text-left">
+              {searching ? (
+                <div className="text-slate-500 text-center py-4">Searching platform...</div>
+              ) : searchResults && (Object.values(searchResults).some(arr => Array.isArray(arr) && arr.length > 0)) ? (
+                <div className="space-y-4">
+                  {/* Users Section */}
+                  {searchResults.users?.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Users</p>
+                      {searchResults.users.map(u => (
+                        <div key={u._id} className="p-2 rounded-xl bg-slate-900/40 border border-white/5 flex items-center gap-2">
+                          <span className="h-5 w-5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center font-bold text-[9px]">
+                            {u.name?.charAt(0).toUpperCase()}
+                          </span>
+                          <span className="text-slate-200 truncate font-semibold">{u.name}</span>
+                          <span className="text-slate-500 truncate text-[10px] ml-auto">{u.email}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Workspaces Section */}
+                  {searchResults.workspaces?.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Workspaces</p>
+                      {searchResults.workspaces.map(w => (
+                        <div
+                          key={w._id}
+                          onClick={() => {
+                            setIsSearchFocused(false);
+                            navigate(`/boards/${w._id}`);
+                          }}
+                          className="p-2 rounded-xl bg-slate-900/40 border border-white/5 hover:border-sky-500/35 transition cursor-pointer flex items-center justify-between"
+                        >
+                          <span className="text-slate-200 truncate font-semibold">{w.title}</span>
+                          <span className="text-slate-500 text-[10px]">Owner: {w.createdBy?.name || 'Workspace Owner'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Tasks Section */}
+                  {searchResults.tasks?.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Tasks</p>
+                      {searchResults.tasks.map(t => (
+                        <div
+                          key={t._id}
+                          onClick={() => {
+                            setIsSearchFocused(false);
+                            navigate(`/boards/${t.boardId._id || t.boardId}/tasks/${t._id}`);
+                          }}
+                          className="p-2 rounded-xl bg-slate-900/40 border border-white/5 hover:border-sky-500/35 transition cursor-pointer flex flex-col gap-0.5"
+                        >
+                          <span className="text-slate-200 truncate font-semibold">{t.title}</span>
+                          <span className="text-slate-500 text-[9px]">Workspace: {t.boardId?.title || 'Main Workspace'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Channels Section */}
+                  {searchResults.channels?.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Channels</p>
+                      {searchResults.channels.map((ch, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => {
+                            setIsSearchFocused(false);
+                            navigate(`/boards/${ch.boardId}?channel=${ch.channelName}`);
+                          }}
+                          className="p-2 rounded-xl bg-slate-900/40 border border-white/5 hover:border-sky-500/35 transition cursor-pointer flex items-center justify-between"
+                        >
+                          <span className="text-slate-200 truncate font-semibold">#{ch.channelName}</span>
+                          <span className="text-slate-500 text-[10px]">{ch.workspaceTitle}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-slate-550 text-center py-4">No results matching "{searchQuery}"</div>
+              )}
+            </div>
+          )}
+        </div>
+        )}
+
         {/* Right Side: Quick Actions & Profile */}
         <div className="flex items-center gap-3">
-          <div className="relative" ref={notificationRef}>
+          {user && (
+            <div className="relative" ref={notificationRef}>
             <button
               id="notification-bell"
               onClick={(e) => {
@@ -429,76 +579,60 @@ const Navbar = ({ toggleSidebar }) => {
               </div>
             )}
           </div>
+          )}
           
           {user ? (
-            <>
-              <div className="relative" ref={profileRef}>
-                <div 
-                  className="flex cursor-pointer items-center gap-2 rounded-2xl border border-white/10 bg-slate-900 px-3 py-1.5 transition hover:bg-slate-800" 
-                  onClick={() => setIsProfileOpen(!isProfileOpen)}
-                >
-                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-sky-500 to-blue-600 text-white text-xs font-bold">
-                    {(user?.name || userName)?.charAt(0) || 'U'}
-                  </span>
-                  <div className="hidden sm:block text-left">
-                    <p className="text-xs font-semibold text-white">{user?.name || userName || 'User'}</p>
+            (() => {
+              const cleanName = (user?.name || userName || 'User').replace(/\s+(User|Admin)$/i, '');
+              return (
+                <div className="relative" ref={profileRef}>
+                  <div 
+                    className="flex cursor-pointer items-center gap-2 rounded-2xl border border-white/10 bg-slate-900 px-3 py-1.5 transition hover:bg-slate-800" 
+                    onClick={() => setIsProfileOpen(!isProfileOpen)}
+                  >
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-sky-500 to-blue-600 text-white text-xs font-bold">
+                      {cleanName.charAt(0) || 'U'}
+                    </span>
+                    <div className="hidden sm:block text-left">
+                      <p className="text-xs font-semibold text-white">{cleanName}</p>
+                    </div>
                   </div>
-                </div>
 
-                {isProfileOpen && (
-                  <div className="absolute right-0 mt-2 z-50 w-64 rounded-2xl border border-white/10 bg-slate-950 p-4 shadow-2xl text-left">
-                    <div className="px-1 py-2">
-                      <p className="text-sm font-bold text-white leading-tight">{user?.name || userName || 'User'}</p>
-                      <p className="text-xs text-slate-400 mt-1 truncate">{user?.email || localStorage.getItem('userEmail') || ''}</p>
-                    </div>
-                    <div className="my-2 border-t border-white/10" />
-                    <div className="space-y-1">
-                      <button
-                        onClick={() => {
-                          setIsProfileOpen(false);
-                          navigate('/profile');
-                        }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition text-left"
-                      >
-                        <HiOutlineUser className="h-4.5 w-4.5 text-slate-400" />
-                        <span>Profile</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setIsProfileOpen(false);
-                          navigate('/settings');
-                        }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition text-left"
-                      >
-                        <HiOutlineCog className="h-4.5 w-4.5 text-slate-400" />
-                        <span>Settings</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setIsProfileOpen(false);
-                          navigate('/profile');
-                        }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition text-left"
-                      >
-                        <HiOutlineLockClosed className="h-4.5 w-4.5 text-slate-400" />
-                        <span>Security</span>
-                      </button>
+                  {isProfileOpen && (
+                    <div className="absolute right-0 mt-2 z-50 w-64 rounded-2xl border border-white/10 bg-slate-950 p-4 shadow-2xl text-left">
+                      <div className="px-1 py-2">
+                        <p className="text-sm font-bold text-white leading-tight">{cleanName}</p>
+                        <p className="text-xs text-slate-400 mt-1 truncate">{user?.email || localStorage.getItem('userEmail') || ''}</p>
+                      </div>
                       <div className="my-2 border-t border-white/10" />
-                      <button
-                        onClick={() => {
-                          setIsProfileOpen(false);
-                          handleLogout();
-                        }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-rose-400 hover:text-white hover:bg-rose-500/10 rounded-xl transition text-left"
-                      >
-                        <HiOutlineLogout className="h-4.5 w-4.5 text-rose-400" />
-                        <span>Sign Out</span>
-                      </button>
+                      <div className="space-y-1">
+                        <button
+                          onClick={() => {
+                            setIsProfileOpen(false);
+                            navigate('/profile');
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition text-left"
+                        >
+                          <HiOutlineUser className="h-4.5 w-4.5 text-slate-400" />
+                          <span>Profile</span>
+                        </button>
+                        <div className="my-2 border-t border-white/10" />
+                        <button
+                          onClick={() => {
+                            setIsProfileOpen(false);
+                            handleLogout();
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-rose-400 hover:text-white hover:bg-rose-500/10 rounded-xl transition text-left"
+                        >
+                          <HiOutlineLogout className="h-4.5 w-4.5 text-rose-400" />
+                          <span>Sign Out</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            </>
+                  )}
+                </div>
+              );
+            })()
           ) : (
             <button
               onClick={() => navigate('/login')}

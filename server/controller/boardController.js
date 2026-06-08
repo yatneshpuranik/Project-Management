@@ -571,21 +571,52 @@ export const searchWorkspaces = async (req, res) => {
   try {
     const { q, filter } = req.query;
     const userId = req.userId;
+    const isPlatformAdmin = req.user?.role === 'ADMIN';
 
     const query = {};
     if (q && q.trim()) {
       query.title = { $regex: q.trim(), $options: 'i' };
     }
 
-    if (filter === 'public') {
-      query.visibility = 'public';
-    } else if (filter === 'private') {
-      query.visibility = 'private';
-    } else if (filter === 'joined') {
-      query.members = userId;
-      query.createdBy = { $ne: userId };
-    } else if (filter === 'owned') {
-      query.createdBy = userId;
+    if (!isPlatformAdmin) {
+      if (filter === 'public') {
+        query.visibility = 'public';
+      } else if (filter === 'private') {
+        query.visibility = 'private';
+        query.$or = [
+          { createdBy: userId },
+          { members: userId }
+        ];
+      } else if (filter === 'joined') {
+        query.members = userId;
+        query.createdBy = { $ne: userId };
+      } else if (filter === 'owned') {
+        query.createdBy = userId;
+      } else {
+        // General discovery: show all public workspaces, and private ones ONLY if user is owner or member
+        query.$or = [
+          { visibility: 'public' },
+          {
+            visibility: 'private',
+            $or: [
+              { createdBy: userId },
+              { members: userId }
+            ]
+          }
+        ];
+      }
+    } else {
+      // Admin sees everything, but respect requested filters
+      if (filter === 'public') {
+        query.visibility = 'public';
+      } else if (filter === 'private') {
+        query.visibility = 'private';
+      } else if (filter === 'joined') {
+        query.members = userId;
+        query.createdBy = { $ne: userId };
+      } else if (filter === 'owned') {
+        query.createdBy = userId;
+      }
     }
 
     const boards = await Board.find(query)

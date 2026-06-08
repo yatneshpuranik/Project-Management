@@ -20,18 +20,16 @@ const AdminSidebar = () => {
     { path: '/admin', label: 'Overview', icon: HiOutlineSparkles, end: true },
     { path: '/admin/users', label: 'Users', icon: HiOutlineUser },
     { path: '/admin/workspaces', label: 'Workspaces', icon: HiOutlineFolder },
-    { path: '/admin/tasks', label: 'Tasks', icon: HiOutlineChartBar },
-    { path: '/admin/invites', label: 'Invites', icon: HiOutlineMailOpen },
-    { path: '/admin/analytics', label: 'Platform Analytics', icon: HiOutlineChartBar },
+    { path: '/admin/analytics', label: 'Analytics', icon: HiOutlineChartBar },
     { path: '/admin/security', label: 'Security Center', icon: HiOutlineLockClosed },
-    { path: '/admin/audit-logs', label: 'Audit Logs', icon: HiOutlineClock },
     { path: '/admin/role-management', label: 'Role Management', icon: HiOutlineShieldCheck },
     { path: '/admin/system-health', label: 'System Health', icon: HiOutlineStatusOnline },
+    { path: '/admin/access-control', label: 'Access Control', icon: HiOutlineShieldCheck },
     { path: '/admin/settings', label: 'Settings', icon: HiOutlineCog },
   ];
 
   return (
-    <aside className="w-64 bg-slate-900/40 border-r border-white/10 p-5 flex flex-col justify-between flex-shrink-0">
+    <aside className="w-72 bg-slate-900/40 border-r border-white/10 p-5 flex flex-col justify-between flex-shrink-0">
       <div className="space-y-2">
         <p className="text-[10px] uppercase tracking-widest font-bold text-slate-500 px-3 mb-3">CONSOLE DIRECTORY</p>
         <nav className="space-y-1.5">

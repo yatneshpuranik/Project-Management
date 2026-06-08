@@ -34,6 +34,12 @@ const TaskDetailsDrawer = ({ taskId, boardId, isOpen, onClose }) => {
   const [comments, setComments] = useState([]);
   const [activities, setActivities] = useState([]);
 
+  // Comment reply & pagination states
+  const [replyTo, setReplyTo] = useState(null);
+  const [commentLimit] = useState(5);
+  const [commentSkip, setCommentSkip] = useState(0);
+  const [hasMoreComments, setHasMoreComments] = useState(false);
+
   // Comment edit state
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editingCommentText, setEditingCommentText] = useState('');
@@ -98,13 +104,15 @@ const TaskDetailsDrawer = ({ taskId, boardId, isOpen, onClose }) => {
     try {
       const [taskRes, commentsRes, activityRes] = await Promise.all([
         axiosInstance.get(`/tasks/${taskId}`),
-        axiosInstance.get(`/tasks/${taskId}/comments`),
+        axiosInstance.get(`/tasks/${taskId}/comments?limit=${commentLimit}&skip=0`),
         axiosInstance.get(`/activity/task/${taskId}`),
       ]);
 
       const taskData = taskRes.data.task;
       setTask(taskData);
       setComments(commentsRes.data.comments || []);
+      setHasMoreComments(commentsRes.data.hasMore || false);
+      setCommentSkip(0);
       setActivities(activityRes.data.activities || []);
 
       // Initialize form fields
@@ -122,6 +130,50 @@ const TaskDetailsDrawer = ({ taskId, boardId, isOpen, onClose }) => {
       onClose();
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchComments = async (skip = 0, append = false) => {
+    if (!taskId) return;
+    try {
+      const res = await axiosInstance.get(`/tasks/${taskId}/comments?limit=${commentLimit}&skip=${skip}`);
+      const fetchedComments = res.data.comments || [];
+      setComments((prev) => {
+        const combined = append ? [...prev, ...fetchedComments] : fetchedComments;
+        const unique = [];
+        const seen = new Set();
+        combined.forEach(c => {
+          if (c?._id && !seen.has(c._id)) {
+            seen.add(c._id);
+            unique.push(c);
+          }
+        });
+        return unique;
+      });
+      setHasMoreComments(res.data.hasMore || false);
+      setCommentSkip(skip);
+    } catch (err) {
+      console.error('Failed to fetch comments:', err);
+      toast.error('Failed to load comments history');
+    }
+  };
+
+  const handlePostReply = async (parentId, text) => {
+    if (!text.trim()) return;
+    try {
+      const response = await axiosInstance.post(`/tasks/${taskId}/comments`, {
+        text: text.trim(),
+        parentId,
+      });
+      setComments((prev) => {
+        if (prev.some((c) => c._id === response.data.comment?._id)) return prev;
+        return [...prev, response.data.comment];
+      });
+      setReplyTo(null);
+      toast.success('Reply posted successfully');
+    } catch (err) {
+      console.error('Failed to post reply:', err);
+      toast.error('Failed to post reply');
     }
   };
 
@@ -483,6 +535,147 @@ const TaskDetailsDrawer = ({ taskId, boardId, isOpen, onClose }) => {
     return task.collaborators.some(c => (c._id || c) === currentUserId);
   }, [task, currentUserId]);
 
+  const rootComments = useMemo(() => comments.filter(c => !c.parentId), [comments]);
+  const replies = useMemo(() => comments.filter(c => c.parentId), [comments]);
+
+  const renderCommentNode = (c, depth = 0) => {
+    const children = replies.filter(r => (r.parentId?._id || r.parentId || '').toString() === c._id.toString());
+    const role = c.userId?.role || (c.userId && typeof c.userId === 'object' ? c.userId.role : '');
+    const isUserAdmin = role === 'ADMIN';
+    const isUserOwner = (c.userId?._id || c.userId || '').toString() === (currentBoard?.createdBy?._id || currentBoard?.createdBy || '').toString();
+    
+    let badge = 'Member Reply';
+    let badgeClass = 'bg-slate-800 text-slate-450';
+    if (isUserAdmin) {
+      badge = 'Admin Reply';
+      badgeClass = 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20';
+    } else if (isUserOwner) {
+      badge = 'Owner Reply';
+      badgeClass = 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+    }
+
+    const isCommentOwner = (c.userId?._id || c.userId || '').toString() === currentUserId;
+    const canDeleteComment = isCommentOwner || isOwner;
+    const isEditingThisComment = editingCommentId === c._id;
+
+    return (
+      <div key={c._id} className="space-y-2 mt-2.5" style={{ marginLeft: depth > 0 ? `${Math.min(depth * 20, 60)}px` : '0px' }}>
+        <div className="bg-slate-950/45 border border-white/5 p-3.5 rounded-2xl text-xs leading-normal">
+          <div className="flex items-center justify-between text-[10px] text-slate-500 mb-2 font-semibold">
+            <div className="flex items-center gap-2">
+              <span className="text-slate-300 font-bold">{c.userName || 'Teammate'}</span>
+              <span className={`text-[8px] font-bold px-1.5 py-0.2 rounded uppercase ${badgeClass}`}>{badge}</span>
+            </div>
+            <span>{new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          </div>
+
+          {isEditingThisComment ? (
+            <div className="space-y-2 pt-1">
+              <input
+                value={editingCommentText}
+                onChange={(e) => setEditingCommentText(e.target.value)}
+                className="w-full rounded-lg border border-white/10 bg-slate-950 px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleEditComment(c._id)}
+                  className="px-2.5 py-1 bg-cyan-500 text-slate-950 rounded font-bold text-[10px]"
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingCommentId(null);
+                    setEditingCommentText('');
+                  }}
+                  className="px-2.5 py-1 bg-slate-850 text-slate-400 rounded text-[10px]"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex justify-between items-start gap-2">
+              <p className="text-slate-200 flex-1 break-words">{c.text}</p>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReplyTo(replyTo === c._id ? null : c._id);
+                    setCommentText('');
+                  }}
+                  className="text-slate-400 hover:text-white transition text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-950 border border-white/5"
+                >
+                  {replyTo === c._id ? 'Cancel' : 'Reply'}
+                </button>
+                
+                {isCommentOwner && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingCommentId(c._id);
+                      setEditingCommentText(c.text);
+                    }}
+                    className="text-slate-500 hover:text-white transition p-0.5"
+                    title="Edit Comment"
+                  >
+                    <HiOutlinePencil className="h-3.5 w-3.5" />
+                  </button>
+                )}
+                {canDeleteComment && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteComment(c._id)}
+                    className="text-slate-500 hover:text-rose-400 transition p-0.5"
+                    title="Delete Comment"
+                  >
+                    <HiOutlineTrash className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {replyTo === c._id && (
+          <div className="p-3 bg-slate-950/60 border border-white/10 rounded-xl space-y-2 mt-1.5" style={{ marginLeft: '12px' }}>
+            <p className="text-[9px] font-bold uppercase text-slate-500 tracking-wider">Replying to {c.userName}</p>
+            <div className="flex gap-2">
+              <input
+                id={`reply-input-${c._id}`}
+                placeholder="Type your reply..."
+                className="flex-1 rounded-xl border border-white/10 bg-slate-900 px-3 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && e.target.value.trim()) {
+                    handlePostReply(c._id, e.target.value.trim());
+                    e.target.value = '';
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const inputEl = document.getElementById(`reply-input-${c._id}`);
+                  if (inputEl && inputEl.value.trim()) {
+                    handlePostReply(c._id, inputEl.value.trim());
+                    inputEl.value = '';
+                  }
+                }}
+                className="rounded-xl bg-slate-100 hover:bg-white text-slate-950 px-3.5 py-1.5 text-xs font-bold transition"
+              >
+                Send
+              </button>
+            </div>
+          </div>
+        )}
+
+        {children.map(child => renderCommentNode(child, depth + 1))}
+      </div>
+    );
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -494,7 +687,7 @@ const TaskDetailsDrawer = ({ taskId, boardId, isOpen, onClose }) => {
       />
 
       {/* Slide-over panel */}
-      <div className="w-screen max-w-xl h-full flex flex-col bg-slate-900 border-l border-white/10 shadow-2xl relative z-10 overflow-hidden">
+      <div className="w-screen max-w-2xl h-full flex flex-col bg-slate-900 border-l border-white/10 shadow-2xl relative z-10 overflow-hidden">
         
         {/* Drawer Header */}
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 bg-slate-900/80 backdrop-blur flex-shrink-0">
@@ -969,78 +1162,19 @@ const TaskDetailsDrawer = ({ taskId, boardId, isOpen, onClose }) => {
                 </div>
 
                 <div className="space-y-3.5 max-h-56 overflow-y-auto custom-scrollbar pr-2">
-                  {comments.length > 0 ? (
-                    comments.map((comment) => {
-                      const isCommentOwner = (comment.userId?._id || comment.userId || '').toString() === currentUserId;
-                      const canDeleteComment = isCommentOwner || isOwner;
-                      const isEditingThisComment = editingCommentId === comment._id;
-
-                      return (
-                        <div key={comment._id} className="bg-slate-900 border border-white/5 p-3 rounded-xl text-xs leading-normal">
-                          <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1.5 font-semibold">
-                            <span className="text-slate-300">{comment.userName || comment.user?.name || 'Teammate'}</span>
-                            <span>{new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                          </div>
-                          {isEditingThisComment ? (
-                            <div className="space-y-2 pt-1">
-                              <input
-                                value={editingCommentText}
-                                onChange={(e) => setEditingCommentText(e.target.value)}
-                                className="w-full rounded-lg border border-white/10 bg-slate-950 px-2 py-1.5 text-xs text-white outline-none focus:border-sky-500"
-                              />
-                              <div className="flex gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => handleEditComment(comment._id)}
-                                  className="px-2.5 py-1 bg-cyan-500 text-slate-950 rounded font-bold text-[10px]"
-                                >
-                                  Save
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setEditingCommentId(null);
-                                    setEditingCommentText('');
-                                  }}
-                                  className="px-2.5 py-1 bg-slate-800 text-slate-400 rounded text-[10px]"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex justify-between items-start gap-2">
-                              <p className="text-slate-200 flex-1 break-words">{comment.text}</p>
-                              <div className="flex items-center gap-1.5 flex-shrink-0">
-                                {isCommentOwner && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setEditingCommentId(comment._id);
-                                      setEditingCommentText(comment.text);
-                                    }}
-                                    className="text-slate-500 hover:text-white transition p-0.5"
-                                    title="Edit Comment"
-                                  >
-                                    <HiOutlinePencil className="h-3.5 w-3.5" />
-                                  </button>
-                                )}
-                                {canDeleteComment && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteComment(comment._id)}
-                                    className="text-slate-500 hover:text-rose-400 transition p-0.5"
-                                    title="Delete Comment"
-                                  >
-                                    <HiOutlineTrash className="h-3.5 w-3.5" />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })
+                  {rootComments.length > 0 ? (
+                    <>
+                      {rootComments.map((comment) => renderCommentNode(comment))}
+                      {hasMoreComments && (
+                        <button
+                          type="button"
+                          onClick={() => fetchComments(commentSkip + commentLimit, true)}
+                          className="w-full mt-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-350 rounded-xl text-[10px] font-bold transition border border-white/5"
+                        >
+                          Load Older Comments
+                        </button>
+                      )}
+                    </>
                   ) : (
                     <p className="text-[11px] text-slate-500 italic">No comments yet. Post the first comment!</p>
                   )}

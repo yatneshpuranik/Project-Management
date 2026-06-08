@@ -15,7 +15,20 @@ const AdminWorkspaces = () => {
   const fetchWorkspaces = async () => {
     try {
       const res = await axiosInstance.get('/admin/workspaces');
-      setWorkspaces(res.data.workspaces || []);
+      const list = res.data.workspaces || [];
+      setWorkspaces(list);
+
+      const activeBoardId = searchParams.get('boardId');
+      if (activeBoardId && list.length > 0) {
+        const matched = list.find((w) => w._id === activeBoardId);
+        if (matched) {
+          const detailRes = await axiosInstance.get(`/admin/workspaces/${activeBoardId}`);
+          setSelectedWorkspace({
+            ...detailRes.data.workspace,
+            tasks: detailRes.data.tasks || [],
+          });
+        }
+      }
     } catch (e) {
       console.error(e);
       toast.error('Failed to load workspaces list');
@@ -26,12 +39,15 @@ const AdminWorkspaces = () => {
 
   useEffect(() => {
     fetchWorkspaces();
-  }, []);
+  }, [searchParams]);
 
   const handleSelectWorkspace = async (workspace) => {
     try {
       const res = await axiosInstance.get(`/admin/workspaces/${workspace._id}`);
-      setSelectedWorkspace(res.data.workspace);
+      setSelectedWorkspace({
+        ...res.data.workspace,
+        tasks: res.data.tasks || [],
+      });
     } catch (e) {
       console.error(e);
       setSelectedWorkspace(workspace);
@@ -146,6 +162,7 @@ const AdminWorkspaces = () => {
             onForceAddMember={handleForceAddMember}
             onForceRemoveMember={handleForceRemoveMember}
             onTransferOwnership={handleTransferOwnership}
+            onRefreshWorkspace={handleSelectWorkspace}
           />
         </div>
       </div>

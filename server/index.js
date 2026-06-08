@@ -12,6 +12,7 @@ import activityRoute from "./route/activityRoute.js";
 import analyticsRoute from "./route/analyticsRoute.js";
 import notificationRoute from "./route/notificationRoute.js";
 import adminRoute from "./route/admin/adminRoutes.js";
+import searchRoute from "./route/searchRoute.js";
 import setupSocket from "./socket/socket.js";
 import cookieParser from "cookie-parser";
 import cors from "cors";
@@ -61,6 +62,7 @@ app.use("/api/activity", activityRoute);
 app.use("/api/analytics", analyticsRoute);
 app.use("/api/notifications", notificationRoute);
 app.use("/api/admin", adminRoute);
+app.use("/api/search", searchRoute);
 
 import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
@@ -83,6 +85,9 @@ import logger from "./utils/logger.js";
 
 app.use((err, req, res, next) => {
   logger.error('Unhandled error:', err);
+  if (res.headersSent) {
+    return next(err);
+  }
   res.status(err.status || 500).json({
     message: err.message || 'Internal server error',
   });

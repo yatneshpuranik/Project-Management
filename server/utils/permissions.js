@@ -32,7 +32,7 @@ export const seedPermissions = async () => {
     ];
 
     for (const def of defaults) {
-      await Permission.findOneAndUpdate({ role: def.role }, def, { upsert: true, new: true });
+      await Permission.findOneAndUpdate({ role: def.role }, def, { upsert: true, returnDocument: 'after' });
     }
     console.log('Seeded roles and permissions matrix defaults successfully.');
   } catch (err) {

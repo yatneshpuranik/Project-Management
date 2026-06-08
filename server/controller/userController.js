@@ -92,7 +92,7 @@ export const loginUser = async (req, res) => {
 
         const normalizedEmail = email.toLowerCase().trim();
         const user = await User.findOne({
-            $or: [{ email: normalizedEmail }, { name: email }]
+            $or: [{ email: normalizedEmail }, { name: email }, { username: email }]
         });
 
         if (!user) {
@@ -435,12 +435,14 @@ export const searchUsers = async (req, res) => {
         
         let board = null;
         let excludeIds = [req.userId];
+        let decBoardId = boardId;
 
         if (boardId) {
-            if (!mongoose.Types.ObjectId.isValid(boardId)) {
+            decBoardId = decryptId(boardId);
+            if (!mongoose.Types.ObjectId.isValid(decBoardId)) {
                 return res.status(400).json({ success: false, message: 'Invalid board ID format' });
             }
-            board = await Board.findById(boardId);
+            board = await Board.findById(decBoardId);
             if (board) {
                 if (board.createdBy) excludeIds.push(board.createdBy.toString());
                 if (board.members) {
@@ -450,7 +452,7 @@ export const searchUsers = async (req, res) => {
 
             // Exclude pending board invites
             const pendingInvites = await Notification.find({
-                boardId,
+                boardId: decBoardId,
                 type: 'board_invite',
                 status: 'pending'
             });
@@ -642,6 +644,50 @@ export const updatePresence = async (req, res) => {
             message: 'Presence status updated',
             presenceStatus: status,
             lastActive: user.lastActive
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+export const updateProfile = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { name, username, password } = req.body;
+
+        if (!name || !name.trim()) {
+            return res.status(400).json({ success: false, message: 'Name is required' });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        user.name = name.trim();
+
+        if (username && username.trim()) {
+            const cleanUsername = username.trim().toLowerCase();
+            const usernameExists = await User.findOne({ username: cleanUsername, _id: { $ne: userId } });
+            if (usernameExists) {
+                return res.status(400).json({ success: false, message: 'Username is already taken' });
+            }
+            user.username = cleanUsername;
+        }
+
+        if (password && password.trim()) {
+            user.password = await bycrypt.hash(password.trim(), 10);
+        }
+
+        await user.save();
+
+        const safeUser = user.toObject();
+        delete safeUser.password;
+
+        return res.status(200).json({
+            success: true,
+            message: 'Profile updated successfully',
+            user: encryptUserIds(safeUser)
         });
     } catch (err) {
         return res.status(500).json({ success: false, message: err.message });

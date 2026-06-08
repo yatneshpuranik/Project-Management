@@ -150,10 +150,13 @@ const BoardsScreen = () => {
 
   // Global search for workspaces
   useEffect(() => {
-    if (!boardId) {
-      searchGlobalWorkspaces(discoveryQuery, discoveryFilter)
-    }
-  }, [boardId, discoveryFilter])
+    if (boardId) return;
+    const delayDebounce = setTimeout(() => {
+      searchGlobalWorkspaces(discoveryQuery, discoveryFilter);
+    }, 400);
+
+    return () => clearTimeout(delayDebounce);
+  }, [discoveryQuery, discoveryFilter, boardId]);
 
   // Search users for invite
   useEffect(() => {

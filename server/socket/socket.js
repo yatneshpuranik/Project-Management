@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 import Board from '../model/board.js';
 import Task from '../model/task.js';
 import User from '../model/userModel.js';
@@ -94,6 +95,21 @@ export const forceDisconnectUser = (userId, reason = 'Your account has been bloc
   }
 };
 
+const extractBoardId = (data) => {
+  if (!data) return null;
+  if (typeof data === 'string') return data;
+  if (typeof data === 'object') {
+    if (data.boardId) {
+      if (typeof data.boardId === 'object') {
+        return data.boardId._id || data.boardId.id || null;
+      }
+      return data.boardId;
+    }
+    return data._id || data.id || null;
+  }
+  return null;
+};
+
 const authenticateSocket = async (socket, next) => {
   try {
     let token = socket.handshake.auth?.token || socket.handshake.query?.token;
@@ -142,11 +158,16 @@ const setupSocket = (io) => {
 
     // User joins a board
     socket.on('join-board', async (data) => {
-      const { boardId } = data;
-      const decBoardId = decryptId(boardId);
+      const bId = extractBoardId(data);
+      const decBoardId = decryptId(bId);
       const room = `board-${decBoardId}`;
       const decUserId = socket.userId;
       const userName = socket.userName;
+
+      if (!decBoardId || !mongoose.Types.ObjectId.isValid(decBoardId)) {
+        socket.emit('error-msg', { message: 'Invalid board ID format' });
+        return;
+      }
 
       try {
         const board = await Board.findById(decBoardId);
@@ -544,23 +565,30 @@ const setupSocket = (io) => {
 
     // Activity created
     socket.on('activity-created', (data) => {
-      const { boardId, activity } = data;
-      const decBoardId = decryptId(boardId);
+      const bId = extractBoardId(data);
+      const decBoardId = decryptId(bId);
       const room = `board-${decBoardId}`;
 
-      io.to(room).emit('activity-created', { activity });
+      if (!decBoardId || !mongoose.Types.ObjectId.isValid(decBoardId)) {
+        return;
+      }
+
+      io.to(room).emit('activity-created', { activity: data.activity });
       console.log(`Activity created in board ${decBoardId}`);
     });
 
     // WORKSPACE CHAT EVENT HANDLERS
     socket.on('workspaceChatJoined', async (data) => {
-      const { boardId } = data;
-      const decBoardId = decryptId(boardId);
+      const bId = extractBoardId(data);
+      const decBoardId = decryptId(bId);
       const room = `board-chat-${decBoardId}`;
       const decUserId = socket.userId;
       const userName = socket.userName;
 
-      if (!decBoardId) return;
+      if (!decBoardId || !mongoose.Types.ObjectId.isValid(decBoardId)) {
+        socket.emit('error-msg', { message: 'Invalid board ID format' });
+        return;
+      }
 
       try {
         const board = await Board.findById(decBoardId);

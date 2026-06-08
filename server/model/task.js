@@ -90,6 +90,9 @@ const taskSchema = new mongoose.Schema(
           trim: true,
           required: true,
         },
+        parentId: {
+          type: mongoose.Schema.Types.ObjectId,
+        },
         createdAt: {
           type: Date,
           default: Date.now,

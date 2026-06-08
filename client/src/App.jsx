@@ -22,11 +22,10 @@ import AdminLayout from './components/admin/layout/AdminLayout.jsx'
 import AdminDashboard from './pages/admin/AdminDashboard.jsx'
 import AdminUsers from './pages/admin/AdminUsers.jsx'
 import AdminWorkspaces from './pages/admin/AdminWorkspaces.jsx'
-import AdminTasks from './pages/admin/AdminTasks.jsx'
-import AdminInvites from './pages/admin/AdminInvites.jsx'
 import AdminAnalytics from './pages/admin/AdminAnalytics.jsx'
 import AdminSecurity from './pages/admin/AdminSecurity.jsx'
 import AdminSettings from './pages/admin/AdminSettings.jsx'
+import AdminAccessControl from './pages/admin/AdminAccessControl.jsx'
 
 
 const App = () => {
@@ -51,10 +50,16 @@ const App = () => {
       try {
         const result = await axiosInstance.get('/user/me')
         localStorage.setItem('userRole', result.data.user.role || 'USER')
+        localStorage.setItem('userId', result.data.user._id)
+        localStorage.setItem('userName', result.data.user.name)
+        localStorage.setItem('userEmail', result.data.user.email)
         dispatch(setUser(result.data.user))
       } catch {
         localStorage.removeItem('token')
         localStorage.removeItem('userRole')
+        localStorage.removeItem('userId')
+        localStorage.removeItem('userName')
+        localStorage.removeItem('userEmail')
         dispatch(setUser(null))
       } finally {
         setAuthChecked(true)
@@ -128,13 +133,11 @@ const App = () => {
             <Route path='/admin' element={<AdminDashboard />} />
             <Route path='/admin/users' element={<AdminUsers />} />
             <Route path='/admin/workspaces' element={<AdminWorkspaces />} />
-            <Route path='/admin/tasks' element={<AdminTasks />} />
-            <Route path='/admin/invites' element={<AdminInvites />} />
             <Route path='/admin/analytics' element={<AdminAnalytics />} />
             <Route path='/admin/security' element={<AdminSecurity view="security" />} />
-            <Route path='/admin/audit-logs' element={<AdminSecurity view="audit" />} />
             <Route path='/admin/role-management' element={<AdminSecurity view="roles" />} />
             <Route path='/admin/system-health' element={<AdminSecurity view="health" />} />
+            <Route path='/admin/access-control' element={<AdminAccessControl />} />
             <Route path='/admin/settings' element={<AdminSettings />} />
           </Route>
 
