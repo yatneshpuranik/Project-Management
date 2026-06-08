@@ -193,6 +193,7 @@ const boardSlice = createSlice({
 
     // Add Member
     builder.addCase(addBoardMember.fulfilled, (state, action) => {
+      if (!action.payload) return;
       const index = state.boards.findIndex(
         board => board._id === action.payload._id
       );

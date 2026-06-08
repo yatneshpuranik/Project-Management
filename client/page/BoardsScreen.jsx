@@ -849,69 +849,71 @@ const BoardsScreen = () => {
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider">Workspace Directory</h3>
                 
                 {/* Invite Dropdown Trigger */}
-                <div className="relative">
-                  <button
-                    onClick={() => setIsInviteOpen(!isInviteOpen)}
-                    title="Invite Member"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-xl text-xs transition cursor-pointer"
-                  >
-                    <HiOutlineUserAdd className="h-4 w-4" /> Invite Member
-                  </button>
+                {(isOwner || currentBoard?.userPermissions?.canInvite) && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setIsInviteOpen(!isInviteOpen)}
+                      title="Invite Member"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-xl text-xs transition cursor-pointer"
+                    >
+                      <HiOutlineUserAdd className="h-4 w-4" /> Invite Member
+                    </button>
 
-                  {/* Discord Style invite dropdown */}
-                  {isInviteOpen && (
-                    <div className="absolute right-0 mt-2 z-40 w-85 bg-slate-950/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-4 space-y-3.5">
-                      <div className="flex justify-between items-center pb-2 border-b border-white/5">
-                        <h4 className="text-xs font-bold text-white uppercase tracking-wider">Invite teammate</h4>
-                        <button onClick={() => setIsInviteOpen(false)} className="text-slate-500 hover:text-slate-200 transition">✕</button>
-                      </div>
-                      <input
-                        value={inviteSearch}
-                        onChange={(e) => setInviteSearch(e.target.value)}
-                        placeholder="Search by name, username or email..."
-                        className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 outline-none focus:border-sky-500 transition duration-200"
-                      />
-                      <div className="max-h-52 overflow-y-auto space-y-2 custom-scrollbar pr-1">
-                        {isSearching ? (
-                          <div className="text-center py-6 text-xs text-slate-500">Searching...</div>
-                        ) : searchResults.length > 0 ? (
-                          searchResults.map((user) => (
-                            <div key={user._id} className="flex justify-between items-center p-2 rounded-xl bg-slate-900/40 border border-white/5 text-xs gap-3 hover:bg-white/5 transition">
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <img
-                                  src={user.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name)}`}
-                                  alt={user.name}
-                                  className="h-7 w-7 rounded-full flex-shrink-0 border border-white/10"
-                                />
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="font-bold text-slate-200 truncate">{user.name}</span>
-                                    <span className="bg-slate-800 text-[8px] px-1.5 py-0.5 rounded uppercase font-semibold text-slate-400">{user.role || 'USER'}</span>
+                    {/* Discord Style invite dropdown */}
+                    {isInviteOpen && (
+                      <div className="absolute right-0 mt-2 z-40 w-85 bg-slate-950/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-4 space-y-3.5">
+                        <div className="flex justify-between items-center pb-2 border-b border-white/5">
+                          <h4 className="text-xs font-bold text-white uppercase tracking-wider">Invite teammate</h4>
+                          <button onClick={() => setIsInviteOpen(false)} className="text-slate-500 hover:text-slate-200 transition">✕</button>
+                        </div>
+                        <input
+                          value={inviteSearch}
+                          onChange={(e) => setInviteSearch(e.target.value)}
+                          placeholder="Search by name, username or email..."
+                          className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 outline-none focus:border-sky-500 transition duration-200"
+                        />
+                        <div className="max-h-52 overflow-y-auto space-y-2 custom-scrollbar pr-1">
+                          {isSearching ? (
+                            <div className="text-center py-6 text-xs text-slate-500">Searching...</div>
+                          ) : searchResults.length > 0 ? (
+                            searchResults.map((user) => (
+                              <div key={user._id} className="flex justify-between items-center p-2 rounded-xl bg-slate-900/40 border border-white/5 text-xs gap-3 hover:bg-white/5 transition">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <img
+                                    src={user.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name)}`}
+                                    alt={user.name}
+                                    className="h-7 w-7 rounded-full flex-shrink-0 border border-white/10"
+                                  />
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-bold text-slate-200 truncate">{user.name}</span>
+                                      <span className="bg-slate-800 text-[8px] px-1.5 py-0.5 rounded uppercase font-semibold text-slate-400">{user.role || 'USER'}</span>
+                                    </div>
+                                    <p className="text-slate-500 text-[10px] truncate">{user.email}</p>
                                   </div>
-                                  <p className="text-slate-500 text-[10px] truncate">{user.email}</p>
                                 </div>
+                                {user.inviteStatus === 'pending' ? (
+                                  <span className="bg-amber-500/10 text-amber-400 px-2.5 py-1 rounded-xl font-semibold text-[10px]">Pending</span>
+                                ) : (
+                                  <button
+                                    onClick={() => handleSendInvite(user._id)}
+                                    className="px-3 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-xl transition text-[10px] cursor-pointer"
+                                  >
+                                    Invite
+                                  </button>
+                                )}
                               </div>
-                              {user.inviteStatus === 'pending' ? (
-                                <span className="bg-amber-500/10 text-amber-400 px-2.5 py-1 rounded-xl font-semibold text-[10px]">Pending</span>
-                              ) : (
-                                <button
-                                  onClick={() => handleSendInvite(user._id)}
-                                  className="px-3 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-xl transition text-[10px] cursor-pointer"
-                                >
-                                  Invite
-                                </button>
-                              )}
-                            </div>
-                          ))
-                        ) : inviteSearch.trim() ? (
-                          <div className="text-center py-6 text-xs text-slate-500">No users found.</div>
-                        ) : (
-                          <div className="text-center py-6 text-[11px] text-slate-500">Type name or email to search.</div>
-                        )}
+                            ))
+                          ) : inviteSearch.trim() ? (
+                            <div className="text-center py-6 text-xs text-slate-500">No users found.</div>
+                          ) : (
+                            <div className="text-center py-6 text-[11px] text-slate-500">Type name or email to search.</div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* OWNER SECTION */}
@@ -949,8 +951,8 @@ const BoardsScreen = () => {
                           </div>
                         </div>
 
-                        {/* Eviction Button only for owner */}
-                        {isOwner && (
+                        {/* Eviction Button */}
+                        {(isOwner || currentBoard?.userPermissions?.canRemoveMember) && (
                           <button
                             onClick={() => handleEvictMember(member._id)}
                             className="px-2.5 py-1 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500 text-rose-400 hover:text-white transition rounded-xl text-[10px] font-bold cursor-pointer"
@@ -975,10 +977,9 @@ const BoardsScreen = () => {
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider">Workspace Admin</h4>
                 <p className="text-[10px] text-slate-500 mt-0.5">Manage your workspace access and permissions.</p>
               </div>
-
-              {isOwner ? (
-                <div className="space-y-4 pt-2 border-t border-white/5">
-                  {/* Ownership Transfer */}
+              <div className="space-y-4 pt-2 border-t border-white/5">
+                {/* Ownership Transfer */}
+                {(isOwner || currentBoard?.userPermissions?.canTransferOwnership) && (
                   <form onSubmit={handleTransfer} className="space-y-3 pt-2">
                     <label className="block text-[9px] uppercase font-bold text-slate-400">Transfer Ownership</label>
                     
@@ -988,7 +989,7 @@ const BoardsScreen = () => {
                           value={transferSearch}
                           onChange={(e) => setTransferSearch(e.target.value)}
                           placeholder="Search member by name or email..."
-                          className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 outline-none focus:border-cyan-500"
+                          className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-650 outline-none focus:border-cyan-500"
                         />
                         {transferSearchResults.length > 0 && (
                           <div className="absolute left-0 right-0 mt-1 z-50 max-h-40 overflow-y-auto bg-slate-900 border border-white/10 rounded-xl shadow-2xl p-2 space-y-1 custom-scrollbar">
@@ -1056,8 +1057,10 @@ const BoardsScreen = () => {
                       Confirm Ownership Transfer
                     </button>
                   </form>
+                )}
 
-                  {/* Permanent delete workspace */}
+                {/* Permanent delete workspace */}
+                {(isOwner || currentBoard?.userPermissions?.canDeleteWorkspace) && (
                   <div className="pt-2 border-t border-white/5 space-y-1.5">
                     <span className="block text-[9px] uppercase font-bold text-rose-400">Caution Zone</span>
                     <button
@@ -1067,18 +1070,20 @@ const BoardsScreen = () => {
                       Delete Board Workspace
                     </button>
                   </div>
-                </div>
-              ) : (
-                <div className="pt-2 border-t border-white/5 space-y-2">
-                  <p className="text-[10px] text-slate-500">You are a Workspace Member. You can choose to leave this workspace. This removes your card assignments.</p>
-                  <button
-                    onClick={handleLeaveWorkspace}
-                    className="w-full py-2 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500 hover:text-white text-rose-400 font-bold rounded-xl text-xs transition cursor-pointer"
-                  >
-                    Leave Workspace
-                  </button>
-                </div>
-              )}
+                )}
+
+                {!isOwner && (
+                  <div className="pt-2 border-t border-white/5 space-y-2">
+                    <p className="text-[10px] text-slate-500">You are a Workspace Member. You can choose to leave this workspace. This removes your card assignments.</p>
+                    <button
+                      onClick={handleLeaveWorkspace}
+                      className="w-full py-2 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500 hover:text-white text-rose-400 font-bold rounded-xl text-xs transition cursor-pointer"
+                    >
+                      Leave Workspace
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}

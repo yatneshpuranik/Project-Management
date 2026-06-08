@@ -17,6 +17,12 @@ const sanitizeBoard = (board, userRole) => {
       b.createdBy.email = undefined;
     }
     if (b.members) {
+      b.members = b.members.filter(m => {
+        if (m && typeof m === 'object') {
+          return m.role !== 'ADMIN';
+        }
+        return true;
+      });
       b.members.forEach(m => {
         if (m && m.role === 'ADMIN') {
           m.email = undefined;
@@ -65,9 +71,17 @@ export const createBoard = async (req, res) => {
       ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || ''
     }).catch(e => {});
 
+    const boardObj = board.toObject();
+    boardObj.userPermissions = {
+      canInvite: true,
+      canRemoveMember: true,
+      canTransferOwnership: true,
+      canManagePermissions: true,
+    };
+
     res.status(201).json({
       message: 'Board created successfully',
-      board: sanitizeBoard(board, req.user?.role),
+      board: sanitizeBoard(boardObj, req.user?.role),
     });
   } catch (error) {
     res.status(500).json({ message: 'Error creating board', error: error.message });
@@ -86,9 +100,21 @@ export const getBoards = async (req, res) => {
       .populate('members', 'name email avatar role presenceStatus lastActive')
       .sort({ createdAt: -1 });
 
+    const boardsWithPerms = [];
+    for (const b of boards) {
+      const boardObj = b.toObject();
+      boardObj.userPermissions = {
+        canInvite: await checkPermission(userId, b._id, 'canInvite'),
+        canRemoveMember: await checkPermission(userId, b._id, 'canRemoveMember'),
+        canTransferOwnership: await checkPermission(userId, b._id, 'canTransferOwnership'),
+        canManagePermissions: await checkPermission(userId, b._id, 'canManagePermissions'),
+      };
+      boardsWithPerms.push(sanitizeBoard(boardObj, req.user?.role));
+    }
+
     res.status(200).json({
       message: 'Boards fetched successfully',
-      boards: boards.map(b => sanitizeBoard(b, req.user?.role)),
+      boards: boardsWithPerms,
     });
   } catch (error) {
     res.status(500).json({ message: 'Error fetching boards', error: error.message });
@@ -122,9 +148,17 @@ export const getBoardById = async (req, res) => {
       return res.status(403).json({ message: 'Unauthorized access' });
     }
 
+    const boardObj = board.toObject();
+    boardObj.userPermissions = {
+      canInvite: await checkPermission(userId, boardId, 'canInvite'),
+      canRemoveMember: await checkPermission(userId, boardId, 'canRemoveMember'),
+      canTransferOwnership: await checkPermission(userId, boardId, 'canTransferOwnership'),
+      canManagePermissions: await checkPermission(userId, boardId, 'canManagePermissions'),
+    };
+
     res.status(200).json({
       message: 'Board fetched successfully',
-      board: sanitizeBoard(board, req.user?.role),
+      board: sanitizeBoard(boardObj, req.user?.role),
     });
   } catch (error) {
     res.status(500).json({ message: 'Error fetching board', error: error.message });
@@ -273,9 +307,17 @@ export const updateBoard = async (req, res) => {
     await board.save();
     await board.populate(['createdBy', 'members']);
 
+    const boardObj = board.toObject();
+    boardObj.userPermissions = {
+      canInvite: await checkPermission(userId, boardId, 'canInvite'),
+      canRemoveMember: await checkPermission(userId, boardId, 'canRemoveMember'),
+      canTransferOwnership: await checkPermission(userId, boardId, 'canTransferOwnership'),
+      canManagePermissions: await checkPermission(userId, boardId, 'canManagePermissions'),
+    };
+
     res.status(200).json({
       message: 'Board updated successfully',
-      board: sanitizeBoard(board, req.user?.role),
+      board: sanitizeBoard(boardObj, req.user?.role),
     });
   } catch (error) {
     res.status(500).json({ message: 'Error updating board', error: error.message });
@@ -734,9 +776,17 @@ export const joinPublicWorkspace = async (req, res) => {
       console.error('Socket emit failed for public join:', err);
     }
 
+    const boardObj = board.toObject();
+    boardObj.userPermissions = {
+      canInvite: await checkPermission(userId, boardId, 'canInvite'),
+      canRemoveMember: await checkPermission(userId, boardId, 'canRemoveMember'),
+      canTransferOwnership: await checkPermission(userId, boardId, 'canTransferOwnership'),
+      canManagePermissions: await checkPermission(userId, boardId, 'canManagePermissions'),
+    };
+
     res.status(200).json({
       message: 'Joined workspace successfully',
-      board: encryptUserIds(board)
+      board: sanitizeBoard(boardObj, req.user?.role)
     });
   } catch (error) {
     res.status(500).json({ message: 'Error joining workspace', error: error.message });
@@ -898,9 +948,17 @@ export const acceptAccessRequest = async (req, res) => {
       console.error('Socket emit failed for accept access request:', err);
     }
 
+    const boardObj = board.toObject();
+    boardObj.userPermissions = {
+      canInvite: await checkPermission(currentUserId, boardId, 'canInvite'),
+      canRemoveMember: await checkPermission(currentUserId, boardId, 'canRemoveMember'),
+      canTransferOwnership: await checkPermission(currentUserId, boardId, 'canTransferOwnership'),
+      canManagePermissions: await checkPermission(currentUserId, boardId, 'canManagePermissions'),
+    };
+
     res.status(200).json({
       message: 'Access request accepted',
-      board: encryptUserIds(board)
+      board: sanitizeBoard(boardObj, req.user?.role)
     });
   } catch (error) {
     res.status(500).json({ message: 'Error accepting access request', error: error.message });
