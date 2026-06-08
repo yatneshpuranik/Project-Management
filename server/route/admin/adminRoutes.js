@@ -3,7 +3,9 @@ import {
   getGlobalStats,
   getAuditLogs,
   getSecuritySummary,
-  getSystemHealth
+  getSystemHealth,
+  getAllPermissions,
+  updatePermission
 } from '../../controller/admin/adminController.js';
 import { verifyAdmin } from '../../middleware/admin/adminMiddleware.js';
 import { authenticateToken } from '../../middleware/auth.js';
@@ -24,6 +26,8 @@ router.get('/stats', getGlobalStats);
 router.get('/audit-logs', getAuditLogs);
 router.get('/security/summary', getSecuritySummary);
 router.get('/system-health', getSystemHealth);
+router.get('/permissions', getAllPermissions);
+router.put('/permissions/:role', updatePermission);
 
 // Sub-routers
 router.use('/users', adminUserRoutes);

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose'
+import { seedPermissions } from '../utils/permissions.js'
 
 /**
  * Connect to MongoDB
@@ -17,6 +18,7 @@ const connectDb = async () => {
     const dbName = mongoose.connection?.name || mongoose.connection?.db?.databaseName || 'unknown'
     console.log('MongoDB Connected')
     console.log(`Database: ${dbName}`)
+    await seedPermissions()
     return
   } catch (err) {
     console.error('MongoDB connection failed:', err.message)

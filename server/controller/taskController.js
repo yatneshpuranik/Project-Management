@@ -7,6 +7,28 @@ import User from '../model/userModel.js';
 import { createActivity } from './activityController.js';
 import { getIo, emitToUser } from '../socket/socket.js';
 import { encryptUserIds, encryptId } from '../utils/idCrypt.js';
+import { checkPermission } from '../utils/permissions.js';
+
+const sanitizeTask = (task, userRole) => {
+  if (!task) return task;
+  const t = encryptUserIds(task);
+  if (userRole !== 'ADMIN') {
+    if (t.assignedTo && t.assignedTo.role === 'ADMIN') {
+      t.assignedTo.email = undefined;
+    }
+    if (t.createdBy && t.createdBy.role === 'ADMIN') {
+      t.createdBy.email = undefined;
+    }
+    if (t.collaborators) {
+      t.collaborators.forEach(c => {
+        if (c && c.role === 'ADMIN') {
+          c.email = undefined;
+        }
+      });
+    }
+  }
+  return t;
+};
 
 const isBoardMember = (board, userId) => {
   if (!board) return false;
@@ -15,17 +37,20 @@ const isBoardMember = (board, userId) => {
 };
 const applyAutoStatus = (task) => {
   const p = task.progress || 0;
-  if (p === 0) {
-    task.status = 'Todo';
-  } else if (p > 0 && p < 100) {
-    task.status = 'In Progress';
-  } else if (p === 100) {
+  if (p === 100) {
     if (task.status === 'Todo') {
       task.status = 'In Progress';
+      task.progress = 0;
     } else if (task.status === 'In Progress') {
       task.status = 'Review';
+      task.progress = 0;
     } else if (task.status === 'Review') {
       task.status = 'Done';
+      task.progress = 100;
+    }
+  } else if (p > 0 && p < 100) {
+    if (task.status === 'Todo') {
+      task.status = 'In Progress';
     }
   }
 };
@@ -65,8 +90,9 @@ export const createTask = async (req, res) => {
       if (!isValidAssignee) {
         return res.status(400).json({ message: 'Assigned user must be a board member' });
       }
-      if (!isOwner && assigneeId !== userId) {
-        return res.status(403).json({ message: 'Only the board owner can assign tasks to other members' });
+      const hasAssignPerm = await checkPermission(userId, boardId, 'canAssignTasks');
+      if (!hasAssignPerm && assigneeId !== userId) {
+        return res.status(403).json({ message: 'Only authorized roles can assign tasks to other members' });
       }
     }
 
@@ -102,16 +128,34 @@ export const createTask = async (req, res) => {
     applyAutoStatus(task);
 
     await task.save();
-    await task.populate(['assignedTo', 'createdBy', 'parentTaskId']);
+    await task.populate([
+      { path: 'assignedTo', select: 'name email avatar role' },
+      { path: 'createdBy', select: 'name email avatar role' },
+      { path: 'collaborators', select: 'name email avatar role' }
+    ]);
 
     // Create Activity
     await createActivity({
       boardId,
       taskId: task._id,
       userId,
-      userName: req.userName || 'Owner',
+      userName: req.userName || 'Member',
       type: 'Task Created',
-      message: `${req.userName || 'Owner'} created task: "${title}"`,
+      message: `${req.userName || 'Member'} created task "${title}"`,
+    });
+
+    try {
+      const io = getIo();
+      if (io) {
+        io.to(`board-${boardId}`).emit('task-created', {
+          task: sanitizeTask(task, req.user?.role),
+        });
+      }
+    } catch (err) {}
+
+    res.status(201).json({
+      message: 'Task created successfully',
+      task: sanitizeTask(task, req.user?.role),
     });
 
     // Realtime notification if assignedTo is provided
@@ -183,14 +227,14 @@ export const getTasksByBoard = async (req, res) => {
     }
 
     const tasks = await Task.find({ boardId })
-      .populate('assignedTo', 'name email avatar')
-      .populate('createdBy', 'name email avatar')
-      .populate('collaborators', 'name email avatar')
+      .populate('assignedTo', 'name email avatar role')
+      .populate('createdBy', 'name email avatar role')
+      .populate('collaborators', 'name email avatar role')
       .sort({ position: 1 });
 
     res.status(200).json({
       message: 'Tasks fetched successfully',
-      tasks: tasks.map((t) => encryptUserIds(t)),
+      tasks: tasks.map((t) => sanitizeTask(t, req.user?.role)),
     });
   } catch (error) {
     res.status(500).json({ message: 'Error fetching tasks', error: error.message });
@@ -208,9 +252,9 @@ export const getTaskById = async (req, res) => {
     }
 
     const task = await Task.findById(taskId)
-      .populate('assignedTo', 'name email avatar')
-      .populate('createdBy', 'name email avatar')
-      .populate('collaborators', 'name email avatar');
+      .populate('assignedTo', 'name email avatar role')
+      .populate('createdBy', 'name email avatar role')
+      .populate('collaborators', 'name email avatar role');
 
     if (!task) {
       return res.status(404).json({ message: 'Task not found' });
@@ -227,7 +271,7 @@ export const getTaskById = async (req, res) => {
 
     res.status(200).json({
       message: 'Task fetched successfully',
-      task: encryptUserIds(task),
+      task: sanitizeTask(task, req.user?.role),
     });
   } catch (error) {
     res.status(500).json({ message: 'Error fetching task', error: error.message });

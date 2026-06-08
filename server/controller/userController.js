@@ -4,7 +4,7 @@ import bycrypt from 'bcryptjs';
 import Board from '../model/board.js';
 import Task from '../model/task.js';
 import AuditLog from '../model/auditLog.js';
-import { encryptUserIds, encryptId } from '../utils/idCrypt.js';
+import { encryptUserIds, encryptId, decryptId } from '../utils/idCrypt.js';
 import mongoose from 'mongoose';
 
 export const createUser = async (req, res) => {
@@ -422,7 +422,7 @@ export const unblockUser = async (req, res) => {
 export const searchUsers = async (req, res) => {
     try {
         const { q } = req.query;
-        const boardId = req.query.boardId ? decryptId(req.query.boardId) : undefined;
+        const boardId = req.query.boardId;
         if (!q || !q.trim()) {
             return res.status(200).json({
                 success: true,

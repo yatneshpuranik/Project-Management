@@ -5,8 +5,27 @@ import { createActivity } from './activityController.js';
 import User from '../model/userModel.js';
 import { getIo, evictUserFromBoard, emitToUser } from '../socket/socket.js';
 import { encryptUserIds, encryptId } from '../utils/idCrypt.js';
+import { checkPermission } from '../utils/permissions.js';
 import Notification from '../model/notification.js';
 import AuditLog from '../model/auditLog.js';
+
+const sanitizeBoard = (board, userRole) => {
+  if (!board) return board;
+  const b = encryptUserIds(board);
+  if (userRole !== 'ADMIN') {
+    if (b.createdBy && b.createdBy.role === 'ADMIN') {
+      b.createdBy.email = undefined;
+    }
+    if (b.members) {
+      b.members.forEach(m => {
+        if (m && m.role === 'ADMIN') {
+          m.email = undefined;
+        }
+      });
+    }
+  }
+  return b;
+};
 
 // Create Board
 export const createBoard = async (req, res) => {
@@ -48,7 +67,7 @@ export const createBoard = async (req, res) => {
 
     res.status(201).json({
       message: 'Board created successfully',
-      board: encryptUserIds(board),
+      board: sanitizeBoard(board, req.user?.role),
     });
   } catch (error) {
     res.status(500).json({ message: 'Error creating board', error: error.message });
@@ -69,7 +88,7 @@ export const getBoards = async (req, res) => {
 
     res.status(200).json({
       message: 'Boards fetched successfully',
-      boards: boards.map(b => encryptUserIds(b)),
+      boards: boards.map(b => sanitizeBoard(b, req.user?.role)),
     });
   } catch (error) {
     res.status(500).json({ message: 'Error fetching boards', error: error.message });
@@ -105,18 +124,17 @@ export const getBoardById = async (req, res) => {
 
     res.status(200).json({
       message: 'Board fetched successfully',
-      board: encryptUserIds(board),
+      board: sanitizeBoard(board, req.user?.role),
     });
   } catch (error) {
     res.status(500).json({ message: 'Error fetching board', error: error.message });
   }
 };
 
-// Update Board
 export const updateBoard = async (req, res) => {
   try {
     const { boardId } = req.params;
-    const { title, description, visibility, channels, createdBy } = req.body;
+    const { title, description, visibility, channels, createdBy, isArchived } = req.body;
     const userId = req.userId;
 
     if (!mongoose.Types.ObjectId.isValid(boardId)) {
@@ -129,15 +147,16 @@ export const updateBoard = async (req, res) => {
       return res.status(404).json({ message: 'Board not found' });
     }
 
-    // Only creator or platform admin can edit board details
     const isCreator = (board.createdBy?._id || board.createdBy || '').toString() === userId;
     const isAdmin = req.user?.role === 'ADMIN';
-    if (!isCreator && !isAdmin) {
-      return res.status(403).json({ message: 'Only board creator or admin can edit' });
-    }
 
     // Handle Ownership Transfer
     if (createdBy && createdBy !== board.createdBy.toString()) {
+      const hasTransferPerm = await checkPermission(userId, boardId, 'canTransferOwnership');
+      if (!hasTransferPerm) {
+        return res.status(403).json({ message: 'Only authorized roles can transfer workspace ownership' });
+      }
+
       if (!mongoose.Types.ObjectId.isValid(createdBy)) {
         return res.status(400).json({ message: 'Invalid new owner ID format' });
       }
@@ -191,17 +210,72 @@ export const updateBoard = async (req, res) => {
       } catch (e) {}
     }
 
-    if (title) board.title = title;
-    if (description !== undefined) board.description = description;
-    if (visibility) board.visibility = visibility;
-    if (channels) board.channels = channels;
+    // Handle Channel modification
+    if (channels !== undefined) {
+      const hasChannelPerm = await checkPermission(userId, boardId, 'canManageChannels');
+      if (!hasChannelPerm) {
+        return res.status(403).json({ message: 'Only authorized roles can manage workspace channels' });
+      }
+      board.channels = channels;
+    }
+
+    // Handle Archive modification
+    if (isArchived !== undefined && isArchived !== board.isArchived) {
+      const hasArchivePerm = await checkPermission(userId, boardId, 'canArchiveWorkspace');
+      if (!hasArchivePerm) {
+        return res.status(403).json({ message: 'Only authorized roles can archive this workspace' });
+      }
+      board.isArchived = isArchived;
+
+      // Log activity
+      await createActivity({
+        boardId: board._id,
+        userId,
+        userName: req.userName || 'Owner',
+        type: isArchived ? 'Workspace Archived' : 'Workspace Restored',
+        message: `${req.userName || 'Owner'} has ${isArchived ? 'archived' : 'restored'} the workspace: "${board.title}"`,
+      });
+
+      // Notify members
+      const allMembers = [board.createdBy, ...board.members].map(m => m.toString());
+      const uniqueMembers = Array.from(new Set(allMembers)).filter(mId => mId !== userId);
+      for (const memberId of uniqueMembers) {
+        const notif = new Notification({
+          recipient: memberId,
+          sender: userId,
+          senderName: req.userName || 'Owner',
+          type: 'workspace_archived',
+          status: 'unread',
+          boardId: board._id,
+          boardTitle: board.title,
+          message: `${req.userName || 'Owner'} has ${isArchived ? 'archived' : 'restored'} the workspace: "${board.title}"`
+        });
+        await notif.save();
+        try {
+          emitToUser(memberId, 'invitationSent', {
+            recipientId: encryptId(memberId),
+            notification: encryptUserIds(notif)
+          });
+        } catch (err) {}
+      }
+    }
+
+    // Edit general workspace settings
+    if (title || description !== undefined || visibility) {
+      if (!isCreator && !isAdmin) {
+        return res.status(403).json({ message: 'Only board creator or admin can edit general workspace settings' });
+      }
+      if (title) board.title = title;
+      if (description !== undefined) board.description = description;
+      if (visibility) board.visibility = visibility;
+    }
 
     await board.save();
     await board.populate(['createdBy', 'members']);
 
     res.status(200).json({
       message: 'Board updated successfully',
-      board: encryptUserIds(board),
+      board: sanitizeBoard(board, req.user?.role),
     });
   } catch (error) {
     res.status(500).json({ message: 'Error updating board', error: error.message });
@@ -224,8 +298,9 @@ export const deleteBoard = async (req, res) => {
       return res.status(404).json({ message: 'Board not found' });
     }
 
-    if ((board.createdBy?._id || board.createdBy || '').toString() !== userId) {
-      return res.status(403).json({ message: 'Only board creator can delete' });
+    const hasDeletePerm = await checkPermission(userId, boardId, 'canDeleteWorkspace');
+    if (!hasDeletePerm) {
+      return res.status(403).json({ message: 'Only authorized roles can delete this workspace' });
     }
 
     // Log Workspace Deleted
@@ -238,6 +313,27 @@ export const deleteBoard = async (req, res) => {
       details: `Workspace deleted by owner: ${board.title}`,
       ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || ''
     }).catch(e => {});
+
+    // Notify members about workspace deletion
+    const allMembers = [board.createdBy, ...board.members].map(m => m.toString());
+    const uniqueMembers = Array.from(new Set(allMembers)).filter(mId => mId !== userId);
+    for (const memberId of uniqueMembers) {
+      const notif = new Notification({
+        recipient: memberId,
+        sender: userId,
+        senderName: req.userName || 'Owner',
+        type: 'workspace_deleted',
+        status: 'unread',
+        message: `The workspace "${board.title}" was deleted by the owner.`
+      });
+      await notif.save();
+      try {
+        emitToUser(memberId, 'invitationSent', {
+          recipientId: encryptId(memberId),
+          notification: encryptUserIds(notif)
+        });
+      } catch (err) {}
+    }
 
     // Delete all tasks in this board
     await Task.deleteMany({ boardId });
@@ -272,8 +368,9 @@ export const addMember = async (req, res) => {
       return res.status(404).json({ message: 'Board not found' });
     }
 
-    if ((board.createdBy?._id || board.createdBy || '').toString() !== userId) {
-      return res.status(403).json({ message: 'Only board creator can add members' });
+    const hasInvitePerm = await checkPermission(userId, boardId, 'canInvite');
+    if (!hasInvitePerm) {
+      return res.status(403).json({ message: 'Only authorized roles can invite members to this workspace' });
     }
 
     if ((board.createdBy?._id || board.createdBy || '').toString() === memberId) {
@@ -373,8 +470,9 @@ export const removeMember = async (req, res) => {
       return res.status(404).json({ message: 'Board not found' });
     }
 
-    if ((board.createdBy?._id || board.createdBy || '').toString() !== userId) {
-      return res.status(403).json({ message: 'Only board creator can remove members' });
+    const hasRemovePerm = await checkPermission(userId, boardId, 'canRemoveMember');
+    if (!hasRemovePerm) {
+      return res.status(403).json({ message: 'Only authorized roles can remove members from this workspace' });
     }
 
     if ((board.createdBy?._id || board.createdBy || '').toString() === memberId) {
@@ -491,7 +589,7 @@ export const searchWorkspaces = async (req, res) => {
     }
 
     const boards = await Board.find(query)
-      .populate('createdBy', 'name email avatar')
+      .populate('createdBy', 'name email avatar role')
       .limit(30);
 
     const safeBoards = boards.map(board => {
@@ -506,11 +604,16 @@ export const searchWorkspaces = async (req, res) => {
         joinStatus = 'pending';
       }
 
+      const creatorEnc = encryptUserIds(board.createdBy);
+      if (req.user?.role !== 'ADMIN' && board.createdBy && board.createdBy.role === 'ADMIN') {
+        if (creatorEnc) creatorEnc.email = undefined;
+      }
+
       return {
         _id: encryptId(board._id),
         title: board.title,
         description: board.description,
-        createdBy: encryptUserIds(board.createdBy),
+        createdBy: creatorEnc,
         membersCount: board.members.length,
         visibility: board.visibility || 'private',
         joinStatus,

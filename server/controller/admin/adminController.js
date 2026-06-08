@@ -2,6 +2,7 @@ import User from '../../model/userModel.js';
 import Board from '../../model/board.js';
 import Task from '../../model/task.js';
 import AuditLog from '../../model/auditLog.js';
+import Permission from '../../model/permission.js';
 import { encryptUserIds } from '../../utils/idCrypt.js';
 import mongoose from 'mongoose';
 import { getIo } from '../../socket/socket.js';
@@ -168,5 +169,42 @@ export const getSystemHealth = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Error fetching system health', error: error.message });
+  }
+};
+
+// Get all permissions
+export const getAllPermissions = async (req, res) => {
+  try {
+    const permissions = await Permission.find();
+    res.status(200).json({ success: true, permissions });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching permissions', error: error.message });
+  }
+};
+
+// Update permission for a role
+export const updatePermission = async (req, res) => {
+  try {
+    const { role } = req.params;
+    const updates = req.body;
+    
+    const permission = await Permission.findOneAndUpdate({ role }, updates, { new: true });
+    if (!permission) {
+      return res.status(404).json({ success: false, message: 'Role not found' });
+    }
+
+    await logAdminAction(req, 'Permissions Changed', undefined, role, `Updated permissions for role: ${role}`);
+
+    // Notify users of permission changes
+    try {
+      const io = getIo();
+      if (io) {
+        io.emit('permissions-changed', { role, permissions: permission });
+      }
+    } catch (socketErr) {}
+
+    res.status(200).json({ success: true, message: `Permissions for ${role} updated successfully`, permission });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating permissions', error: error.message });
   }
 };
