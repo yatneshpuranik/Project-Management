@@ -122,8 +122,8 @@ const AdminUsers = () => {
     }
   };
 
-  const filteredUsersList = users.filter((u) => 
-    u.name?.toLowerCase().includes(userQuery.toLowerCase()) || 
+  const filteredUsersList = users.filter((u) =>
+    u.name?.toLowerCase().includes(userQuery.toLowerCase()) ||
     u.email?.toLowerCase().includes(userQuery.toLowerCase())
   );
 

@@ -121,7 +121,7 @@ const ProfileScreen = () => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">New Password (optional)</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">New Password </label>
                 <input
                   type="password"
                   value={password}
@@ -143,9 +143,8 @@ const ProfileScreen = () => {
               <button
                 type="submit"
                 disabled={updating}
-                className={`w-full rounded-2xl text-slate-950 py-3 text-xs font-bold shadow-lg transition disabled:opacity-50 cursor-pointer ${
-                  isAdmin ? 'bg-cyan-500 hover:bg-cyan-400 shadow-cyan-500/10' : 'bg-sky-500 hover:bg-sky-400 shadow-sky-500/10'
-                }`}
+                className={`w-full rounded-2xl text-slate-950 py-3 text-xs font-bold shadow-lg transition disabled:opacity-50 cursor-pointer ${isAdmin ? 'bg-cyan-500 hover:bg-cyan-400 shadow-cyan-500/10' : 'bg-sky-500 hover:bg-sky-400 shadow-sky-500/10'
+                  }`}
               >
                 {updating ? 'Saving Changes...' : 'Save Changes'}
               </button>
@@ -173,7 +172,7 @@ const ProfileScreen = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="mt-8 pt-4 border-t border-white/5 space-y-3">
               {isAdmin ? (
                 <button

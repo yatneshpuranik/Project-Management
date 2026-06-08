@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  HiOutlineShieldCheck, 
-  HiOutlineLogout, 
-  HiOutlineBell, 
+import {
+  HiOutlineShieldCheck,
+  HiOutlineLogout,
+  HiOutlineBell,
   HiOutlineUser
 } from 'react-icons/hi';
 import axiosInstance from '../../../../utils/axiosInstance';
@@ -105,7 +105,7 @@ const AdminNavbar = () => {
 
   const handleNotificationClick = (notif) => {
     setIsNotificationsOpen(false);
-    
+
     // Notification click navigation rules
     if (notif.type === 'permission_changed' || notif.type === 'role_change') {
       navigate('/admin/access-control');
@@ -139,7 +139,7 @@ const AdminNavbar = () => {
       <div className="flex items-center gap-4 text-xs font-semibold">
         {/* Notifications Icon & Drawer */}
         <div className="relative" ref={notifRef}>
-          <button 
+          <button
             onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
             className="text-slate-400 hover:text-white transition relative p-2 rounded-xl bg-slate-950 border border-white/10"
           >
