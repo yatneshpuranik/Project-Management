@@ -185,7 +185,7 @@ const LoginScreen = () => {
         </form>
 
         <div className="mt-6 text-center text-sm text-slate-400">
-          {isRegister ? 'Already have an account?' : 'New to our platform?'}
+          {isRegister ? 'Already have an account?' : 'New to WorkSync?'}
           <button
             onClick={() => {
               setIsRegister(!isRegister)

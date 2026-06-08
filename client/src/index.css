@@ -1,156 +1,216 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
+
+@theme {
+  --color-slate-950: #0A0E17;
+  --color-slate-900: #111827;
+  --color-slate-800: #161F2E;
+  --color-slate-700: #1B2638;
+  --color-slate-600: #26354A;
+  
+  --color-blue-500: #4F8CFF;
+  --color-blue-600: #4F8CFF;
+  --color-sky-500: #4F8CFF;
+  --color-sky-400: #6DA2FF;
+  
+  --color-emerald-500: #10B981;
+  --color-amber-500: #F59E0B;
+  --color-rose-500: #EF4444;
+  
+  --color-slate-100: #F8FAFC;
+  --color-slate-200: #F8FAFC;
+  --color-slate-300: #E2E8F0;
+  --color-slate-400: #94A3B8;
+  --color-slate-500: #64748B;
+  
+  --color-zinc-950: #0A0E17;
+  --color-zinc-900: #111827;
+  --color-zinc-800: #161F2E;
+}
+
 :root {
   color-scheme: dark;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-synthesis: none;
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #0f172a;
-  color: #e2e8f0;
-}
-
-html {
-  scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  background: radial-gradient(circle at top, rgba(56, 189, 248, 0.12), transparent 40%),
-    linear-gradient(180deg, #020617 0%, #0f172a 100%);
-}
-
-body::selection {
-  background-color: rgba(56, 189, 248, 0.35);
-  color: white;
-}
-
-#root {
-  min-height: 100vh;
-}
-
-button,
-input,
-textarea,
-select {
-  font: inherit;
+  background-color: #0A0E17 !important;
+  background-image: none !important;
+  color: #F8FAFC;
 }
 
 .dark body {
-  background: radial-gradient(circle at top, rgba(14, 165, 233, 0.14), transparent 40%),
-    linear-gradient(180deg, #030712 0%, #020617 100%);
+  background-color: #0A0E17 !important;
+  background-image: none !important;
 }
 
-@layer base {
-  * {
-    box-sizing: border-box;
-  }
+/* Custom Scrollbar Styles for a high-end interface */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.16);
 }
 
-/* 
-@layer components {
-  .glass-card {
-    @apply rounded-3xl border border-white/10 bg-slate-900/80 backdrop-blur-xl shadow-soft;
-  }
+/* Premium Card Rounding */
+.rounded-xl {
+  border-radius: 12px !important;
+}
+.rounded-2xl {
+  border-radius: 16px !important;
+}
+.rounded-3xl {
+  border-radius: 20px !important;
+}
 
-  .panel-card {
-    @apply rounded-3xl bg-slate-950/90 shadow-soft border border-slate-800/60;
-  }
+/* Base input and form element overrides - 52px height on desktop */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+input:not([type]),
+textarea,
+select {
+  height: 48px !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  background-color: #111827 !important;
+  color: #F8FAFC !important;
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+  font-size: 14px !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
 
-  .pill-button {
-    @apply inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10;
-  }
-} */
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="search"]:focus,
+input:not([type]):focus,
+textarea:focus,
+select:focus {
+  border-color: rgba(79, 140, 255, 0.3) !important;
+  background-color: #161F2E !important;
+}
 
-/* Desktop-First Premium Readability Adjustments */
-@media (min-width: 1024px) {
-  /* Increase global base size */
-  :root {
-    font-size: 15px;
-  }
+textarea {
+  height: auto !important;
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+}
 
-  /* Standardize input heights and sizes */
-  input[type="text"],
-  input[type="email"],
-  input[type="password"],
-  input[type="search"],
-  input:not([type]),
-  textarea,
-  select {
-    padding-top: 0.65rem !important;
-    padding-bottom: 0.65rem !important;
-    height: 2.85rem !important; /* Standardize desktop input height to ~45px */
-    font-size: 0.9rem !important; /* Scale font size slightly */
-    border-radius: 0.75rem !important;
-  }
+/* Select element styling */
+select {
+  appearance: none !important;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 14px center !important;
+  background-size: 14px !important;
+  padding-right: 36px !important;
+}
 
-  textarea {
-    height: auto !important;
-  }
+/* Premium Button Styling Override */
+button.bg-sky-500,
+button.bg-blue-500,
+button.bg-blue-600 {
+  background-color: #4F8CFF !important;
+  color: #0A0E17 !important;
+  font-weight: 600 !important;
+  border-radius: 12px !important;
+  padding: 10px 20px !important;
+  height: 44px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  border: none !important;
+  cursor: pointer !important;
+  box-shadow: 0 4px 12px rgba(79, 140, 255, 0.12) !important;
+}
 
-  /* Scale default button sizes and padding */
-  button:not([id="notification-bell"]):not(.p-1):not(\.p-1\.5):not(.p-2):not(\.p-0\.5):not(.h-7):not(.h-10):not(.h-9):not(.h-8) {
-    padding-top: 0.65rem !important;
-    padding-bottom: 0.65rem !important;
-    padding-left: 1.35rem !important;
-    padding-right: 1.35rem !important;
-    font-size: 0.9rem !important;
-    border-radius: 0.75rem !important;
-  }
+button.bg-sky-500:hover,
+button.bg-blue-500:hover,
+button.bg-blue-600:hover {
+  background-color: #6DA2FF !important;
+  box-shadow: 0 4px 16px rgba(79, 140, 255, 0.2) !important;
+}
 
-  /* Increase padding in content cards and panels */
-  .p-4.rounded-2xl,
-  .p-5.rounded-2xl,
-  .p-6.rounded-2xl {
-    padding: 1.6rem !important; /* Upgrade card padding */
-  }
+/* Typography utilities */
+@utility text-page-title {
+  font-size: 48px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
 
-  .p-5.rounded-3xl,
-  .p-6.rounded-3xl {
-    padding: 1.85rem !important;
-  }
+@utility text-section-title {
+  font-size: 28px;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
 
-  /* Sidebar item padding and spacing upgrades */
-  aside nav.\.space-y-1\.5 a,
-  aside nav.\.space-y-0\.5 a,
-  nav.space-y-1 a,
-  nav.\.space-y-0\.5 a {
-    padding-top: 0.75rem !important;
-    padding-bottom: 0.75rem !important;
-    font-size: 0.9rem !important; /* Align font size */
-  }
+@utility text-card-title {
+  font-size: 20px;
+  line-height: 1.3;
+  font-weight: 600;
+}
 
-  /* Spacing rules for navigation lists */
-  nav.space-y-1,
-  nav.\.space-y-1\.5,
-  nav.\.space-y-0\.5 {
-    display: flex;
-    flex-direction: column;
-    gap: 0.45rem !important; /* Increase gap between vertical list items */
-  }
+@utility text-body {
+  font-size: 16px;
+  line-height: 1.5;
+}
 
-  /* Table and list row items readability */
-  .cursor-pointer.rounded-2xl.p-4,
-  .cursor-pointer.rounded-2xl.p-3 {
-    padding: 1.2rem 1.4rem !important; /* Increase padding in tables/lists */
-  }
+@utility text-caption {
+  font-size: 14px;
+  line-height: 1.4;
+}
 
-  /* Sizing classes overrides */
-  .text-xs {
-    font-size: 0.85rem !important; /* Scale text-xs to ~13.5px */
-  }
+@utility text-muted {
+  font-size: 13px;
+  color: #94A3B8;
+}
 
-  .text-\[10px\] {
-    font-size: 0.775rem !important; /* Scale text-[10px] to ~12px */
-  }
+/* Modern Enterprise SaaS Tables */
+table {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  width: 100% !important;
+}
 
-  .text-\[9px\] {
-    font-size: 0.75rem !important; /* Scale text-[9px] to ~11.5px */
-  }
+th {
+  background-color: #111827 !important;
+  color: #94A3B8 !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  font-size: 11px !important;
+  padding: 14px 20px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
 
-  .text-\[8px\] {
-    font-size: 0.7rem !important; /* Scale text-[8px] to ~10.5px */
-    padding: 0.2rem 0.5rem !important;
-  }
+td {
+  padding: 16px 20px !important;
+  font-size: 13.5px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+  color: #F8FAFC !important;
+}
+
+tr:hover td {
+  background-color: rgba(255, 255, 255, 0.015) !important;
 }

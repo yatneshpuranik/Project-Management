@@ -4,7 +4,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import axiosInstance from '../utils/axiosInstance';
 import { setUser } from '../redux/userSlice.js';
 import { fetchTasksByBoard } from '../redux/taskSlice.js';
-import { fetchBoards } from '../redux/boardSlice.js';
+import { fetchBoards, fetchBoardById } from '../redux/boardSlice.js';
 import socket from '../utils/socket.js';
 import { HiOutlineBell, HiOutlineViewBoards, HiOutlineMenu, HiOutlineUser, HiOutlineCog, HiOutlineLockClosed, HiOutlineLogout, HiOutlineSearch } from 'react-icons/hi';
 import { toast } from '../utils/toast.js';
@@ -260,6 +260,12 @@ const Navbar = ({ toggleSidebar }) => {
       }
     }
 
+    // Load correct workspace context dynamically
+    if (notif.boardId) {
+      dispatch(fetchBoardById(notif.boardId));
+      dispatch(fetchTasksByBoard(notif.boardId));
+    }
+
     // Navigate to page
     if (notif.taskId && notif.boardId) {
       navigate(`/boards/${notif.boardId}/tasks/${notif.taskId}`);
@@ -290,44 +296,37 @@ const Navbar = ({ toggleSidebar }) => {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-lg shadow-sky-500/20 group-hover:scale-105 transition">
               <HiOutlineViewBoards className="h-5 w-5" />
             </div>
-            {user ? (
-              <div>
-                <p className="text-[10px] font-medium uppercase tracking-[0.24em] text-slate-400">Workspace</p>
-                <h1 className="text-sm font-semibold text-white leading-none mt-1">{activeBoardName}</h1>
-                {currentBoard && (
-                  <p className="text-[9px] text-sky-400 font-semibold mt-1">
-                    Owner: {currentBoard.createdBy?.name || 'Unknown'}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div>
-                <p className="text-[10px] font-medium uppercase tracking-[0.24em] text-slate-400">Platform</p>
-                <h1 className="text-sm font-semibold text-white leading-none mt-1">Kanban Board</h1>
-              </div>
-            )}
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.24em] text-white leading-none">WorkSync</p>
+            </div>
           </Link>
         </div>
 
         {/* Global Search Bar */}
         {user && (
           <div className="hidden md:flex flex-1 max-w-md mx-6 relative" ref={searchRef}>
-            <div className="w-full flex items-center gap-2 bg-slate-900 border border-white/10 rounded-xl px-3 py-1.5 focus-within:border-sky-500 transition">
-              <HiOutlineSearch className="h-4 w-4 text-slate-500" />
-              <input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onFocus={() => setIsSearchFocused(true)}
-                placeholder="Search workspaces, tasks, channels..."
-                className="bg-transparent border-none outline-none text-xs text-white placeholder-slate-650 w-full"
-              />
+            <div className="w-full flex items-center justify-between bg-slate-900 border border-white/5 rounded-xl px-3.5 py-2 focus-within:border-blue-500/30 transition">
+              <div className="flex items-center gap-2 flex-1">
+                <HiOutlineSearch className="h-4 w-4 text-slate-400" />
+                <input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setIsSearchFocused(true)}
+                  placeholder="Search workspaces, tasks, channels..."
+                  className="bg-transparent border-none outline-none text-xs text-white placeholder-slate-500 w-full h-auto !p-0 !min-h-0"
+                />
+              </div>
+              <span className="hidden sm:inline-flex items-center gap-0.5 rounded border border-white/10 bg-slate-950 px-1.5 py-0.5 text-[9px] font-medium text-slate-400">
+                <kbd className="font-sans">⌘</kbd>
+                <kbd className="font-sans">K</kbd>
+              </span>
             </div>
 
             {/* Search Dropdown Overlay */}
             {isSearchFocused && searchQuery.trim() && (
               <div className="absolute top-full left-0 right-0 mt-2 z-50 w-full rounded-2xl border border-white/10 bg-slate-950 p-4 shadow-2xl max-h-96 overflow-y-auto custom-scrollbar text-xs text-left">
               {searching ? (
-                <div className="text-slate-500 text-center py-4">Searching platform...</div>
+                <div className="text-slate-500 text-center py-4">Searching WorkSync...</div>
               ) : searchResults && (Object.values(searchResults).some(arr => Array.isArray(arr) && arr.length > 0)) ? (
                 <div className="space-y-4">
                   {/* Users Section */}
@@ -523,6 +522,11 @@ const Navbar = ({ toggleSidebar }) => {
                                   ? notif.taskTitle || notif.message
                                   : notif.message}"
                             </p>
+                            {notif.boardTitle && (
+                              <p className="text-[10px] text-sky-400 font-semibold mt-1">
+                                Workspace: <span className="text-white">{notif.boardTitle}</span>
+                              </p>
+                            )}
                             <p className="text-[9px] text-slate-500 mt-1">
                               {notif.type === 'task_assign' ? 'Assigned By:' : 'Sender:'} <span className="font-medium text-slate-300">{notif.senderName}</span>
                             </p>

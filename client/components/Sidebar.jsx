@@ -44,7 +44,7 @@ const Sidebar = ({ onLinkClick }) => {
           <nav className="space-y-1">
             {items.map((item) => {
               const Icon = item.icon
-              const isWorkspaceRequired = item.label === 'Analytics' || item.label === 'Settings'
+              const isWorkspaceRequired = item.label === 'Analytics'
 
               const handleClick = (e) => {
                 if (isWorkspaceRequired && !activeBoardId) {
@@ -72,10 +72,10 @@ const Sidebar = ({ onLinkClick }) => {
                   to={item.to}
                   onClick={handleClick}
                   className={
-                    `flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold transition ${
+                    `flex items-center gap-3 rounded-xl px-3.5 py-3 text-xs font-semibold transition ${
                       isCustomActive 
-                        ? 'bg-slate-900 text-sky-400 border border-white/5 shadow-inner' 
-                        : 'text-slate-400 hover:bg-slate-900 hover:text-white border border-transparent'
+                        ? 'bg-blue-600/10 text-blue-500 border border-blue-500/20' 
+                        : 'text-slate-400 hover:bg-slate-900 hover:text-slate-100 border border-transparent'
                     }`
                   }
                 >
@@ -91,20 +91,20 @@ const Sidebar = ({ onLinkClick }) => {
         {!isAdmin && (
           <div className="space-y-2">
             <div className="flex items-center justify-between px-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-500">Workspace Boards</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-500">My Workspaces</p>
               <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-slate-400 border border-white/5">{boards.length}</span>
             </div>
-            <div className="space-y-1 max-h-[30vh] overflow-y-auto custom-scrollbar">
+            <div className="space-y-1.5 max-h-[30vh] overflow-y-auto custom-scrollbar">
               {boards.length > 0 ? (
                 boards.map((board) => (
                   <button
                     key={board._id}
                     type="button"
                     onClick={() => handleSelectBoard(board._id)}
-                    className={`w-full flex flex-col items-start gap-1 rounded-xl px-3 py-2 text-left text-xs transition border ${
+                    className={`w-full flex flex-col items-start gap-1 rounded-xl px-3.5 py-3 text-left text-xs transition border ${
                       activeBoardId === board._id
-                        ? 'border-sky-500/30 bg-slate-900 text-white shadow-md'
-                        : 'border-transparent text-slate-400 hover:bg-slate-900 hover:text-white'
+                        ? 'border-blue-500/20 bg-blue-600/10 text-white shadow-sm'
+                        : 'border-transparent text-slate-400 hover:bg-slate-900 hover:text-slate-100'
                     }`}
                   >
                     <span className="font-semibold truncate w-full">{board.title}</span>

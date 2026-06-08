@@ -544,8 +544,8 @@ const BoardsScreen = () => {
         <header className="rounded-2xl border border-white/10 bg-slate-900/40 p-6 backdrop-blur-md">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-sky-400">Workspace Dashboard</p>
-              <h1 className="mt-2 text-3xl font-semibold text-white">Project Boards</h1>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400">Workspace Dashboard</p>
+              <h1 className="mt-2 text-3xl font-semibold text-white">WorkSync Dashboard</h1>
               <p className="mt-1 text-xs text-slate-400">
                 Review available board workspaces, view team participation, and create new collaborative spaces.
               </p>
@@ -583,16 +583,16 @@ const BoardsScreen = () => {
               <div
                 key={board._id}
                 onClick={() => navigate(`/boards/${board._id}`)}
-                className="group relative flex flex-col justify-between rounded-2xl border border-white/10 bg-slate-900/20 p-5 hover:border-slate-700/60 hover:bg-slate-900/30 cursor-pointer shadow-md transition hover:-translate-y-0.5"
+                className="group relative flex flex-col justify-between rounded-3xl border border-white/5 bg-slate-900/50 p-6 hover:border-blue-500/20 hover:bg-slate-900 cursor-pointer shadow-lg hover:shadow-black/20 transition duration-200 hover:-translate-y-0.5"
               >
                 <div>
                   <div className="flex items-center justify-between text-slate-400 mb-3">
                     <div className="flex items-center gap-2">
-                      <HiOutlineFolder className="h-5 w-5 text-sky-500" />
+                      <HiOutlineFolder className="h-5 w-5 text-blue-500" />
                       <span className="text-[10px] uppercase tracking-wider font-semibold">Workspace</span>
                     </div>
                   </div>
-                  <h3 className="text-sm font-semibold text-white group-hover:text-sky-400 transition truncate">{board.title}</h3>
+                  <h3 className="text-sm font-semibold text-white group-hover:text-blue-500 transition truncate">{board.title}</h3>
                   <p className="mt-1 text-[11px] text-slate-400 line-clamp-2 leading-relaxed min-h-[32px]">{board.description || 'No description provided.'}</p>
                 </div>
 
@@ -620,10 +620,10 @@ const BoardsScreen = () => {
 
             <div
               onClick={() => setIsCreateModalOpen(true)}
-              className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/15 bg-transparent p-6 hover:border-sky-500/40 hover:bg-sky-500/5 cursor-pointer text-slate-400 hover:text-sky-400 transition min-h-[160px]"
+              className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-white/10 bg-transparent p-6 hover:border-blue-500/40 hover:bg-blue-600/5 cursor-pointer text-slate-400 hover:text-blue-500 transition duration-200 min-h-[160px]"
             >
-              <HiOutlinePlus className="h-6 w-6 mb-2" />
-              <span className="text-xs font-semibold">Add New Workspace</span>
+              <HiOutlinePlus className="h-6 w-6 mb-2 text-slate-500 group-hover:text-blue-500 transition" />
+              <span className="text-xs font-semibold text-slate-300">Add New Workspace</span>
               <span className="text-[10px] text-slate-500 mt-1">Start tracking dynamic boards</span>
             </div>
           </div>
@@ -634,7 +634,7 @@ const BoardsScreen = () => {
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400">Discover Workspaces</h2>
-              <p className="text-[11px] text-slate-500">Search and join other public or private workspaces on the platform.</p>
+              <p className="text-[11px] text-slate-500">Search and join other public or private workspaces on WorkSync.</p>
             </div>
             
             <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">

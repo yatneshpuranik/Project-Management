@@ -85,7 +85,7 @@ const ProfileScreen = () => {
               </p>
               <h1 className="mt-3 text-4xl font-semibold text-white">{user.name}</h1>
               <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-400">
-                Manage your credentials, update your account settings, and review your platform metadata.
+                Manage your credentials, update your account settings, and review your WorkSync metadata.
               </p>
             </div>
             <div className="rounded-3xl bg-slate-950/90 px-6 py-4 text-center text-slate-300">

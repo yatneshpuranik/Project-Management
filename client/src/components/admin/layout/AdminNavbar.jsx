@@ -129,7 +129,7 @@ const AdminNavbar = () => {
         <HiOutlineShieldCheck className="h-6 w-6 text-cyan-400" />
         <div>
           <h1 className="text-sm font-bold tracking-wider uppercase text-white flex items-center gap-1.5">
-            Admin Panel <span className="bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-1.5 py-0.2 rounded text-[9px] font-bold uppercase">{userRole}</span>
+            Admin Panel : {currentUserName.split(' ')[0]}
           </h1>
           <p className="text-[10px] text-slate-500 font-semibold mt-0.5">Platform Administration Shell</p>
         </div>
@@ -198,30 +198,25 @@ const AdminNavbar = () => {
         <div className="relative" ref={profileRef}>
           <div
             onClick={() => setIsProfileOpen(!isProfileOpen)}
-            className="flex items-center gap-2 bg-slate-950 border border-white/10 px-3.5 py-2 rounded-xl cursor-pointer hover:bg-slate-900 transition"
+            className="flex items-center gap-2 bg-slate-950 border border-white/10 px-3 py-1.5 rounded-xl cursor-pointer hover:bg-slate-900 transition"
           >
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-slate-300 font-bold">Admin Panel : {currentUserName.replace(/\s+(User|Admin)$/i, '')}</span>
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 text-white text-xs font-bold">
+              {currentUserName.charAt(0).toUpperCase()}
+            </span>
+            <span className="text-slate-300 font-bold">{currentUserName.replace(/\s+(User|Admin)$/i, '')}</span>
           </div>
 
           {isProfileOpen && (
-            <div className="absolute right-0 mt-2 z-50 w-64 rounded-2xl border border-white/10 bg-slate-950 p-4 shadow-2xl text-left">
-              <div className="border-t border-white/10 my-1" />
-              <div className="px-1 py-2 font-sans">
-                <p className="text-sm font-bold text-white leading-tight">{currentUserName}</p>
-                <p className="text-[10px] text-cyan-400 font-bold tracking-wider mt-1">{userRole}</p>
-                <p className="text-xs text-slate-400 mt-1.5 truncate">{currentUserEmail}</p>
-              </div>
-              <div className="my-2 border-t border-white/10" />
+            <div className="absolute right-0 mt-2 z-50 w-48 rounded-2xl border border-white/10 bg-slate-950 p-2 shadow-2xl text-left">
               <div className="space-y-1 font-sans">
                 <button
                   onClick={() => {
                     setIsProfileOpen(false);
                     navigate('/profile');
                   }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-350 hover:text-white hover:bg-white/5 rounded-xl transition text-left"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition text-left"
                 >
-                  <HiOutlineUser className="h-4.5 w-4.5 text-slate-400" />
+                  <HiOutlineUser className="h-4 w-4 text-slate-400" />
                   <span>Profile</span>
                 </button>
                 <button
@@ -229,25 +224,16 @@ const AdminNavbar = () => {
                     setIsProfileOpen(false);
                     handleSignOut();
                   }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-rose-455 hover:text-white hover:bg-rose-500/10 rounded-xl transition text-left"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-rose-400 hover:text-white hover:bg-rose-500/10 rounded-xl transition text-left"
                 >
-                  <HiOutlineLogout className="h-4.5 w-4.5 text-rose-455" />
+                  <HiOutlineLogout className="h-4 w-4 text-rose-400" />
                   <span>Sign Out</span>
                 </button>
               </div>
-              <div className="border-t border-white/10 my-1" />
             </div>
           )}
         </div>
 
-        {/* Header Sign Out button */}
-        <button
-          onClick={handleSignOut}
-          className="text-slate-400 hover:text-rose-400 transition p-2 rounded-xl bg-slate-950 border border-white/10"
-          title="Sign Out Platform"
-        >
-          <HiOutlineLogout className="h-5 w-5" />
-        </button>
       </div>
     </header>
   );

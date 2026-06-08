@@ -146,7 +146,7 @@ const AnalyticsScreen = () => {
       {analytics && analytics.totalTasks === 0 ? (
         <div className="rounded-[32px] border border-dashed border-white/10 bg-slate-900/20 p-12 text-center text-slate-300 shadow-2xl backdrop-blur-sm">
           <p className="text-base font-semibold text-white">No tasks in this workspace</p>
-          <p className="mt-2 text-xs text-slate-400">Add tasks on the Kanban board to start calculating metrics.</p>
+          <p className="mt-2 text-xs text-slate-400">Add tasks in the WorkSync workspace to start calculating metrics.</p>
         </div>
       ) : (
         analytics && (

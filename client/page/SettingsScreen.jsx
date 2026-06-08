@@ -1,22 +1,19 @@
 import { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { updateBoard, fetchBoardById } from '../redux/boardSlice';
+import { updateBoard, fetchBoardById, fetchBoards, setCurrentBoard } from '../redux/boardSlice';
 import axiosInstance from '../utils/axiosInstance';
-import { HiOutlineUserGroup, HiOutlineBell, HiOutlineCog, HiOutlineHashtag, HiOutlinePlus, HiOutlineTrash, HiOutlineLockOpen, HiOutlineLockClosed, HiOutlineUserRemove, HiOutlineShieldCheck } from 'react-icons/hi';
+import { HiOutlineUserGroup, HiOutlineBell, HiOutlineCog, HiOutlineHashtag, HiOutlinePlus, HiOutlineTrash, HiOutlineLockOpen, HiOutlineLockClosed, HiOutlineUserRemove, HiOutlineShieldCheck, HiOutlineChevronDown } from 'react-icons/hi';
 import { toast } from '../utils/toast';
 
 const SettingsScreen = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { currentBoard } = useSelector((state) => state.boards);
+  const { boards, currentBoard } = useSelector((state) => state.boards);
 
   useEffect(() => {
-    if (!currentBoard?._id) {
-      toast.error('Please select a workspace first.');
-      navigate('/boards');
-    }
-  }, [currentBoard, navigate]);
+    dispatch(fetchBoards());
+  }, [dispatch]);
   const currentUserId = localStorage.getItem('userId');
   const userRole = localStorage.getItem('userRole');
 
@@ -90,17 +87,58 @@ const SettingsScreen = () => {
 
   if (!currentBoard) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center text-slate-100">
-        <div className="rounded-[32px] border border-dashed border-white/10 bg-slate-900/20 p-12 text-center text-slate-300 shadow-2xl backdrop-blur-sm">
-          <p className="text-lg font-semibold text-white">No active workspace selected</p>
-          <p className="mt-3 text-sm text-slate-400">Please select a workspace board from the dashboard first.</p>
+      <div className="space-y-6 max-w-4xl font-sans">
+        {/* Header */}
+        <header className="rounded-2xl border border-white/10 bg-slate-900/40 p-6 backdrop-blur-md">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-400 border border-sky-500/20">
+              <HiOutlineCog className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-sky-400">Workspace Management</p>
+              <h1 className="mt-1 text-2xl font-bold text-white">WorkSync Settings</h1>
+              <p className="text-xs text-slate-400 mt-0.5">Please select a workspace from the dropdown below to manage settings.</p>
+            </div>
+          </div>
+        </header>
+
+        {/* Workspace Selector Dropdown */}
+        <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-6 backdrop-blur-md space-y-2">
+          <label className="block text-[10px] uppercase font-bold text-slate-400">Select Workspace</label>
+          <div className="relative max-w-xs">
+            <select
+              value=""
+              onChange={(e) => {
+                const bId = e.target.value;
+                if (bId) {
+                  dispatch(fetchBoardById(bId));
+                }
+              }}
+              className="w-full appearance-none rounded-xl border border-white/10 bg-slate-950 px-4 py-2.5 pr-10 text-xs text-white outline-none focus:border-sky-500 transition cursor-pointer font-semibold"
+            >
+              <option value="">Select Workspace</option>
+              {boards.map((board) => (
+                <option key={board._id} value={board._id}>
+                  {board.title}
+                </option>
+              ))}
+            </select>
+            <HiOutlineChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+          </div>
+        </div>
+
+        <div className="flex min-h-[40vh] items-center justify-center text-slate-100">
+          <div className="rounded-[32px] border border-dashed border-white/10 bg-slate-900/20 p-12 text-center text-slate-300 shadow-2xl backdrop-blur-sm">
+            <p className="text-lg font-semibold text-white">No workspace selected</p>
+            <p className="mt-3 text-sm text-slate-400">Please choose a workspace from the dropdown above to edit its settings.</p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl font-sans">
       {/* Header */}
       <header className="rounded-2xl border border-white/10 bg-slate-900/40 p-6 backdrop-blur-md">
         <div className="flex items-center gap-4">
@@ -109,13 +147,40 @@ const SettingsScreen = () => {
           </div>
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-sky-400">Workspace Management</p>
-            <h1 className="mt-1 text-2xl font-bold text-white">{currentBoard.title} Settings</h1>
+            <h1 className="mt-1 text-2xl font-bold text-white">WorkSync Settings</h1>
             <p className="text-xs text-slate-400 mt-0.5">
-              Workspace Owner: <strong className="text-sky-400">{currentBoard.createdBy?.name || 'Unknown'}</strong>
+              Selected Workspace: <strong className="text-sky-400">{currentBoard.title}</strong>
             </p>
           </div>
         </div>
       </header>
+
+      {/* Workspace Selector Dropdown */}
+      <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-6 backdrop-blur-md space-y-2">
+        <label className="block text-[10px] uppercase font-bold text-slate-400">Select Workspace</label>
+        <div className="relative max-w-xs">
+          <select
+            value={currentBoard?._id || ''}
+            onChange={(e) => {
+              const bId = e.target.value;
+              if (bId) {
+                dispatch(fetchBoardById(bId));
+              } else {
+                dispatch(setCurrentBoard(null));
+              }
+            }}
+            className="w-full appearance-none rounded-xl border border-white/10 bg-slate-950 px-4 py-2.5 pr-10 text-xs text-white outline-none focus:border-sky-500 transition cursor-pointer font-semibold"
+          >
+            <option value="">Select Workspace</option>
+            {boards.map((board) => (
+              <option key={board._id} value={board._id}>
+                {board.title}
+              </option>
+            ))}
+          </select>
+          <HiOutlineChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+        </div>
+      </div>
 
       {message && (
         <div className={`rounded-xl border p-4 text-xs font-semibold ${
