@@ -67,25 +67,25 @@ const AdminAccessControl = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 text-slate-100 font-sans">
-        <span className="h-6 w-6 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin mr-3" />
+      <div className="flex items-center justify-center py-20 text-slate-100">
+        <span className="h-6 w-6 rounded-full border-2 border-blue-500 border-t-transparent animate-spin mr-3" />
         Loading access control matrix...
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 font-sans">
+    <div className="space-y-6">
       <div className="flex flex-col gap-1 border-b border-white/10 pb-4">
         <h2 className="text-xl font-bold text-white flex items-center gap-2">
-          <HiOutlineShieldCheck className="h-6 w-6 text-cyan-400" /> Platform Access Control Matrix
+          <HiOutlineShieldCheck className="h-6 w-6 text-blue-500" /> Platform Access Control Matrix
         </h2>
         <p className="text-xs text-slate-400">
           Configure dynamic action authorization rules across all platform roles. Admins can inspect and modify matrix settings.
         </p>
       </div>
 
-      <div className="bg-slate-900/40 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+      <div className="premium-card p-0 overflow-hidden shadow-2xl">
         <div className="overflow-x-auto custom-scrollbar">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
@@ -112,7 +112,7 @@ const AdminAccessControl = () => {
                       <div className="flex flex-col">
                         <span>{role.replace('_', ' ')}</span>
                         {isPrimaryAdmin && (
-                          <span className="text-[9px] text-cyan-400 font-bold uppercase mt-0.5">
+                          <span className="text-[9px] text-blue-500 font-bold uppercase mt-0.5">
                             Default Bypass
                           </span>
                         )}
@@ -130,7 +130,7 @@ const AdminAccessControl = () => {
                               onChange={() =>
                                 handleTogglePermission(role, p.key, hasPerm)
                               }
-                              className={`h-5 w-5 rounded border-white/15 bg-slate-950 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-slate-950 transition cursor-pointer ${
+                              className={`h-5 w-5 rounded border-white/15 bg-slate-950 text-blue-500 focus:ring-blue-500 focus:ring-offset-slate-950 transition cursor-pointer ${
                                 isPrimaryAdmin ? 'cursor-not-allowed opacity-50' : ''
                               }`}
                             />

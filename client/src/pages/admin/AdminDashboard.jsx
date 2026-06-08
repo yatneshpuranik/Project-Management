@@ -40,7 +40,7 @@ const AdminDashboard = () => {
     return (
       <div className="flex items-center justify-center py-20 text-slate-100">
         <div className="rounded-3xl bg-slate-900 border border-white/10 px-8 py-6 text-xl font-bold shadow-2xl flex flex-col items-center gap-3">
-          <span className="h-6 w-6 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin" />
+          <span className="h-6 w-6 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
           Loading overview data...
         </div>
       </div>

@@ -10,12 +10,12 @@ const UsersTable = ({ users = [], selectedUser, onSelectUser }) => {
             onClick={() => onSelectUser(user)}
             className={`p-4 rounded-2xl border transition cursor-pointer flex justify-between items-center ${
               selectedUser?._id === user._id
-                ? 'bg-cyan-500/10 border-cyan-500'
-                : 'bg-slate-900/30 border-white/5 hover:border-slate-800'
+                ? 'bg-blue-500/10 border-blue-500/30 shadow-md'
+                : 'bg-slate-900/40 border-white/5 hover:border-white/10 hover:bg-slate-900/60'
             }`}
           >
             <div className="flex items-center gap-3">
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-indigo-500 text-white font-bold text-sm">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white font-bold text-sm">
                 {user.name?.charAt(0).toUpperCase()}
               </span>
               <div>

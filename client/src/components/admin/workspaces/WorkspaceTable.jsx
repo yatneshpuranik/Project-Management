@@ -10,12 +10,12 @@ const WorkspaceTable = ({ workspaces = [], selectedWorkspace, onSelectWorkspace 
             onClick={() => onSelectWorkspace(ws)}
             className={`p-4 rounded-2xl border transition cursor-pointer flex justify-between items-center ${
               selectedWorkspace?._id === ws._id
-                ? 'bg-cyan-500/10 border-cyan-500'
-                : 'bg-slate-900/30 border-white/5 hover:border-slate-800'
+                ? 'bg-blue-500/10 border-blue-500/30 shadow-md'
+                : 'bg-slate-900/40 border-white/5 hover:border-white/10 hover:bg-slate-900/60'
             }`}
           >
             <div className="flex items-center gap-3">
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 text-white font-bold">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white font-bold">
                 <HiOutlineFolder className="h-5 w-5" />
               </span>
               <div>

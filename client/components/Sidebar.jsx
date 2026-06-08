@@ -36,7 +36,7 @@ const Sidebar = ({ onLinkClick }) => {
   }
 
   return (
-    <div className="flex h-full flex-col justify-between bg-slate-950 p-4">
+    <div className="flex h-full flex-col justify-between">
       <div className="space-y-6 overflow-y-auto pr-1">
         {/* Navigation Section */}
         <div className="space-y-2">

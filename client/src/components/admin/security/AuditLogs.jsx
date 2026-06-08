@@ -6,7 +6,7 @@ const AuditLogs = ({ auditLogs = [] }) => {
         <p className="text-xs text-slate-400">Comprehensive trace audit logs matching user creation, deletion, and settings updates.</p>
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-900/30">
+      <div className="premium-card p-0 overflow-hidden">
         <table className="w-full text-left border-collapse text-xs">
           <thead>
             <tr className="border-b border-white/10 bg-slate-950/60 text-slate-400 uppercase text-[10px] tracking-wider">
@@ -23,7 +23,7 @@ const AuditLogs = ({ auditLogs = [] }) => {
               auditLogs.map((log) => (
                 <tr key={log._id} className="hover:bg-white/5">
                   <td className="p-4 whitespace-nowrap">{new Date(log.createdAt).toLocaleString()}</td>
-                  <td className="p-4 font-bold text-cyan-400">{log.action}</td>
+                  <td className="p-4 font-bold text-blue-500">{log.action}</td>
                   <td className="p-4">{log.actorName}</td>
                   <td className="p-4">{log.targetName || '-'}</td>
                   <td className="p-4 truncate max-w-[200px]" title={log.details}>{log.details}</td>

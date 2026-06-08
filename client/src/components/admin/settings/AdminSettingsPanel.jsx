@@ -17,7 +17,7 @@ const AdminSettingsPanel = ({ settings, setSettings }) => {
   };
 
   return (
-    <div className="bg-slate-900/30 border border-white/10 p-6 rounded-2xl space-y-5 max-w-xl">
+    <div className="premium-card premium-card-hover space-y-5 max-w-xl">
       <div className="flex items-center justify-between">
         <div>
           <strong className="text-sm text-slate-200">Maintenance Mode</strong>
@@ -27,7 +27,7 @@ const AdminSettingsPanel = ({ settings, setSettings }) => {
           type="checkbox"
           checked={settings.maintenanceMode}
           onChange={handleToggleMaintenance}
-          className="rounded border-white/10 bg-slate-950 text-cyan-500 focus:ring-cyan-500 h-4 w-4 cursor-pointer"
+          className="rounded border-white/10 bg-slate-950 text-blue-500 focus:ring-blue-500 h-4 w-4 cursor-pointer"
         />
       </div>
 
@@ -40,7 +40,7 @@ const AdminSettingsPanel = ({ settings, setSettings }) => {
           type="checkbox"
           checked={settings.registrationEnabled}
           onChange={handleToggleRegistration}
-          className="rounded border-white/10 bg-slate-950 text-cyan-500 focus:ring-cyan-500 h-4 w-4 cursor-pointer"
+          className="rounded border-white/10 bg-slate-950 text-blue-500 focus:ring-blue-500 h-4 w-4 cursor-pointer"
         />
       </div>
 
@@ -52,7 +52,7 @@ const AdminSettingsPanel = ({ settings, setSettings }) => {
         <select
           value={settings.logLevel}
           onChange={handleChangeLogLevel}
-          className="bg-slate-950 border border-white/10 rounded-xl px-2 py-1 text-xs outline-none text-white focus:border-cyan-500"
+          className="bg-slate-950 border border-white/10 rounded-xl px-2 py-1 text-xs outline-none text-white focus:border-blue-500"
         >
           <option value="silent">silent</option>
           <option value="error">error</option>

@@ -4,7 +4,8 @@ import {
   HiOutlineShieldCheck,
   HiOutlineLogout,
   HiOutlineBell,
-  HiOutlineUser
+  HiOutlineUser,
+  HiOutlineSearch
 } from 'react-icons/hi';
 import axiosInstance from '../../../../utils/axiosInstance';
 import socket from '../../../../utils/socket';
@@ -124,116 +125,146 @@ const AdminNavbar = () => {
   const activeUnreadCount = notifications.filter(n => n.status === 'unread' || n.status === 'pending').length;
 
   return (
-    <header className="h-[73px] border-b border-white/10 bg-slate-900/60 backdrop-blur-md px-6 flex items-center justify-between flex-shrink-0 z-30 font-sans">
-      <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/admin')}>
-        <HiOutlineShieldCheck className="h-6 w-6 text-cyan-400" />
-        <div>
-          <h1 className="text-sm font-bold tracking-wider uppercase text-white flex items-center gap-1.5">
-            Admin Panel : {currentUserName.split(' ')[0]}
-          </h1>
-          <p className="text-[10px] text-slate-500 font-semibold mt-0.5">Platform Administration Shell</p>
+    <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/95 backdrop-blur-xl shadow-xl shadow-black/20 h-[73px] flex items-center">
+      <div className="w-full flex items-center justify-between gap-4 px-4 py-3 md:px-6 lg:px-8">
+        
+        {/* Left Side: Brand */}
+        <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/admin')}>
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-lg shadow-sky-500/20 hover:scale-105 transition">
+            <HiOutlineShieldCheck className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-sm font-bold tracking-wider uppercase text-white flex items-center gap-1.5">
+              Admin Panel : {currentUserName.split(' ')[0]}
+            </h1>
+            <p className="text-[10px] text-slate-500 font-semibold mt-0.5">Platform Administration Shell</p>
+          </div>
         </div>
-      </div>
 
-      {/* Topbar Actions */}
-      <div className="flex items-center gap-4 text-xs font-semibold">
-        {/* Notifications Icon & Drawer */}
-        <div className="relative" ref={notifRef}>
-          <button
-            onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-            className="text-slate-400 hover:text-white transition relative p-2 rounded-xl bg-slate-950 border border-white/10"
-          >
-            <HiOutlineBell className="h-5 w-5" />
-            {activeUnreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-cyan-400 rounded-full border border-slate-950" />
-            )}
-          </button>
-
-          {isNotificationsOpen && (
-            <div className="absolute right-0 mt-2 z-50 w-96 rounded-2xl border border-white/10 bg-slate-950 p-4 shadow-2xl text-left">
-              <div className="flex justify-between items-center pb-2 border-b border-white/10 mb-3">
-                <p className="text-xs font-bold text-white uppercase tracking-wider">🔔 Notification Center</p>
-                {activeUnreadCount > 0 && (
-                  <span className="text-[9px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-1.5 py-0.5 rounded">
-                    {activeUnreadCount} Unread
-                  </span>
-                )}
-              </div>
-
-              <div className="max-h-72 overflow-y-auto space-y-2.5 custom-scrollbar pr-1">
-                {notifications.length > 0 ? (
-                  notifications.map((notif) => (
-                    <div
-                      key={notif._id}
-                      onClick={() => handleNotificationClick(notif)}
-                      className="p-3 rounded-xl bg-slate-900/60 border border-white/5 hover:border-cyan-500/25 transition cursor-pointer hover:bg-slate-900"
-                    >
-                      <div className="flex justify-between items-start">
-                        <p className="text-xs font-bold text-white leading-normal truncate max-w-[170px]">
-                          {getNotificationTitle(notif.type)}
-                        </p>
-                        <span className="text-[8px] text-slate-500 font-semibold">{getRelativeTime(notif.createdAt)}</span>
-                      </div>
-                      <p className="text-[10px] text-slate-400 mt-1 leading-normal">{notif.message}</p>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-[10px] text-slate-500 text-center py-8 italic">No notifications in the last 24 hours.</p>
-                )}
-              </div>
-
-              <div className="pt-3 mt-2 border-t border-white/5 flex gap-2">
-                <button
-                  onClick={() => fetchNotifications(!showOlder)}
-                  className="flex-1 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-xl text-[10px] font-bold transition border border-white/5"
-                >
-                  {showOlder ? 'Show Recent Only' : 'Load Older Notifications'}
-                </button>
-              </div>
+        {/* Center: Search Visual Placeholder (to match User Navbar structure) */}
+        <div className="hidden md:flex flex-1 max-w-md mx-6 relative">
+          <div className="w-full flex items-center justify-between bg-slate-900 border border-white/5 rounded-xl px-3.5 py-2 transition opacity-60">
+            <div className="flex items-center gap-2">
+              <HiOutlineSearch className="h-4 w-4 text-slate-400" />
+              <span className="text-xs text-slate-500">Search admin shell...</span>
             </div>
-          )}
+            <span className="hidden sm:inline-flex items-center gap-0.5 rounded border border-white/10 bg-slate-950 px-1.5 py-0.5 text-[9px] font-medium text-slate-400">
+              <kbd className="font-sans">⌘</kbd>
+              <kbd className="font-sans">K</kbd>
+            </span>
+          </div>
         </div>
 
-        {/* User Identity Profile Card & Dropdown */}
-        <div className="relative" ref={profileRef}>
-          <div
-            onClick={() => setIsProfileOpen(!isProfileOpen)}
-            className="flex items-center gap-2 bg-slate-950 border border-white/10 px-3 py-1.5 rounded-xl cursor-pointer hover:bg-slate-900 transition"
-          >
-            <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 text-white text-xs font-bold">
-              {currentUserName.charAt(0).toUpperCase()}
-            </span>
-            <span className="text-slate-300 font-bold">{currentUserName.replace(/\s+(User|Admin)$/i, '')}</span>
+        {/* Right Side: Quick Actions & Profile */}
+        <div className="flex items-center gap-3">
+          {/* Notifications Icon & Drawer */}
+          <div className="relative" ref={notifRef}>
+            <button
+              onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+              className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-slate-900 text-slate-200 transition hover:bg-slate-800"
+            >
+              <HiOutlineBell className="h-5 w-5" />
+              {activeUnreadCount > 0 && (
+                <span className="absolute -right-1 -top-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-sky-400 text-[9px] font-bold text-slate-950 animate-pulse">
+                  {activeUnreadCount}
+                </span>
+              )}
+            </button>
+
+            {isNotificationsOpen && (
+              <div className="absolute right-0 mt-2 z-50 w-96 rounded-2xl border border-white/10 bg-slate-950 p-4 shadow-2xl text-left">
+                <div className="flex justify-between items-center pb-2 border-b border-white/10 mb-3">
+                  <p className="text-xs font-bold text-white uppercase tracking-wider">🔔 Notification Center</p>
+                  {activeUnreadCount > 0 && (
+                    <span className="text-[9px] font-bold bg-blue-600/10 text-blue-500 border border-blue-500/20 px-1.5 py-0.5 rounded">
+                      {activeUnreadCount} Unread
+                    </span>
+                  )}
+                </div>
+
+                <div className="max-h-72 overflow-y-auto space-y-2.5 custom-scrollbar pr-1">
+                  {notifications.length > 0 ? (
+                    notifications.map((notif) => (
+                      <div
+                        key={notif._id}
+                        onClick={() => handleNotificationClick(notif)}
+                        className="p-3 rounded-xl bg-slate-900/60 border border-white/5 hover:border-blue-500/20 transition cursor-pointer hover:bg-slate-900"
+                      >
+                        <div className="flex justify-between items-start">
+                          <p className="text-xs font-bold text-white leading-normal truncate max-w-[170px]">
+                            {getNotificationTitle(notif.type)}
+                          </p>
+                          <span className="text-[8px] text-slate-500 font-semibold">{getRelativeTime(notif.createdAt)}</span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-1 leading-normal">{notif.message}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-[10px] text-slate-500 text-center py-8 italic">No notifications in the last 24 hours.</p>
+                  )}
+                </div>
+
+                <div className="pt-3 mt-2 border-t border-white/5 flex gap-2">
+                  <button
+                    onClick={() => fetchNotifications(!showOlder)}
+                    className="flex-1 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-xl text-[10px] font-bold transition border border-white/5"
+                  >
+                    {showOlder ? 'Show Recent Only' : 'Load Older Notifications'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
-          {isProfileOpen && (
-            <div className="absolute right-0 mt-2 z-50 w-48 rounded-2xl border border-white/10 bg-slate-950 p-2 shadow-2xl text-left">
-              <div className="space-y-1 font-sans">
-                <button
-                  onClick={() => {
-                    setIsProfileOpen(false);
-                    navigate('/profile');
-                  }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition text-left"
-                >
-                  <HiOutlineUser className="h-4 w-4 text-slate-400" />
-                  <span>Profile</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setIsProfileOpen(false);
-                    handleSignOut();
-                  }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-rose-400 hover:text-white hover:bg-rose-500/10 rounded-xl transition text-left"
-                >
-                  <HiOutlineLogout className="h-4 w-4 text-rose-400" />
-                  <span>Sign Out</span>
-                </button>
+          {/* User Identity Profile Card & Dropdown */}
+          <div className="relative" ref={profileRef}>
+            <div
+              onClick={() => setIsProfileOpen(!isProfileOpen)}
+              className="flex cursor-pointer items-center gap-2 rounded-2xl border border-white/10 bg-slate-900 px-3 py-1.5 transition hover:bg-slate-800"
+            >
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-sky-500 to-blue-600 text-white text-xs font-bold">
+                {currentUserName.charAt(0).toUpperCase()}
+              </span>
+              <div className="hidden sm:block text-left">
+                <p className="text-xs font-semibold text-white">{currentUserName.replace(/\s+(User|Admin)$/i, '')}</p>
               </div>
             </div>
-          )}
-        </div>
 
+            {isProfileOpen && (
+              <div className="absolute right-0 mt-2 z-50 w-64 rounded-2xl border border-white/10 bg-slate-950 p-4 shadow-2xl text-left">
+                <div className="px-1 py-2">
+                  <p className="text-sm font-bold text-white leading-tight">{currentUserName.replace(/\s+(User|Admin)$/i, '')}</p>
+                  <p className="text-xs text-slate-400 mt-1 truncate">{currentUserEmail}</p>
+                </div>
+                <div className="my-2 border-t border-white/10" />
+                <div className="space-y-1">
+                  <button
+                    onClick={() => {
+                      setIsProfileOpen(false);
+                      navigate('/profile');
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition text-left"
+                  >
+                    <HiOutlineUser className="h-4 w-4 text-slate-400" />
+                    <span>Profile</span>
+                  </button>
+                  <div className="my-2 border-t border-white/10" />
+                  <button
+                    onClick={() => {
+                      setIsProfileOpen(false);
+                      handleSignOut();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-rose-400 hover:text-white hover:bg-rose-500/10 rounded-xl transition text-left"
+                  >
+                    <HiOutlineLogout className="h-4 w-4 text-rose-400" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+        </div>
       </div>
     </header>
   );

@@ -14,7 +14,7 @@ const OverviewStats = ({ stats, systemHealth }) => {
       {cards.map((card, idx) => {
         const Icon = card.icon;
         return (
-          <div key={idx} className="rounded-2xl border border-white/10 bg-slate-900/30 p-5">
+          <div key={idx} className="premium-card premium-card-hover">
             <div className="flex items-center justify-between text-slate-500">
               <span className="text-[10px] font-bold uppercase tracking-wider">{card.label}</span>
               <Icon className={`h-5 w-5 ${card.color}`} />

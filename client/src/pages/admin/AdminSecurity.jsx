@@ -56,7 +56,7 @@ const AdminSecurity = ({ view = 'security' }) => {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-slate-100">
-        <span className="h-6 w-6 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin mr-3" />
+        <span className="h-6 w-6 rounded-full border-2 border-blue-500 border-t-transparent animate-spin mr-3" />
         Loading security modules...
       </div>
     );
@@ -80,20 +80,20 @@ const AdminSecurity = ({ view = 'security' }) => {
         <div className="space-y-6">
           <div className="flex flex-col gap-1 border-b border-white/10 pb-4">
             <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <HiOutlineShieldCheck className="h-6 w-6 text-cyan-400" /> Privileged Role Hierarchy
+              <HiOutlineShieldCheck className="h-6 w-6 text-blue-500" /> Privileged Role Hierarchy
             </h2>
             <p className="text-xs text-slate-400">View role credentials. Platform administrator accounts cannot be blocked or deleted.</p>
           </div>
 
-          <div className="bg-slate-900/30 border border-white/10 p-5 rounded-2xl space-y-4">
+          <div className="premium-card premium-card-hover space-y-4">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Security Policies</h3>
             <div className="space-y-2.5 text-xs text-slate-300">
               <div className="flex items-center gap-2">
-                <HiOutlineCheckCircle className="h-4.5 w-4.5 text-cyan-400 flex-shrink-0" />
+                <HiOutlineCheckCircle className="h-4.5 w-4.5 text-blue-500 flex-shrink-0" />
                 <span><strong>ADMIN</strong>: platform administrator. Moderator rights to manage workspaces, tasks, and users role updates.</span>
               </div>
               <div className="flex items-center gap-2">
-                <HiOutlineCheckCircle className="h-4.5 w-4.5 text-cyan-400 flex-shrink-0" />
+                <HiOutlineCheckCircle className="h-4.5 w-4.5 text-blue-500 flex-shrink-0" />
                 <span><strong>USER</strong>: platform user. A user can be a Workspace Owner or Workspace Member at the workspace level.</span>
               </div>
             </div>

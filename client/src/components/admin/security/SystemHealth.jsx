@@ -8,7 +8,7 @@ const SystemHealth = ({ systemHealth }) => {
 
       {systemHealth ? (
         <div className="grid gap-6 sm:grid-cols-2">
-          <div className="bg-slate-900/30 border border-white/10 p-5 rounded-2xl space-y-3">
+          <div className="premium-card premium-card-hover space-y-3">
             <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wider">Physical Hardware Footprints</h3>
             <div className="space-y-2 text-xs">
               <p className="flex justify-between">
@@ -34,7 +34,7 @@ const SystemHealth = ({ systemHealth }) => {
             </div>
           </div>
 
-          <div className="bg-slate-900/30 border border-white/10 p-5 rounded-2xl space-y-3">
+          <div className="premium-card premium-card-hover space-y-3">
             <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wider">API Diagnostics</h3>
             <div className="space-y-2 text-xs">
               <p className="flex justify-between">

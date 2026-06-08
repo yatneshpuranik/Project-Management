@@ -34,7 +34,7 @@ const TaskTable = ({
   }, [reassignQuery]);
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-900/30">
+    <div className="overflow-x-auto">
       <table className="w-full text-left border-collapse text-xs">
         <thead>
           <tr className="border-b border-white/10 bg-slate-950/60 text-slate-400 uppercase text-[10px] tracking-wider">
@@ -65,7 +65,7 @@ const TaskTable = ({
                                 setSelectedReassignUser(null);
                                 setReassignQuery('');
                               }}
-                              className="bg-cyan-500 hover:bg-cyan-400 text-slate-955 font-bold px-2 py-0.5 rounded text-[10px] cursor-pointer"
+                              className="bg-blue-500 hover:bg-blue-400 text-slate-950 font-bold px-2 py-0.5 rounded text-[10px] cursor-pointer"
                             >
                               Reassign
                             </button>
@@ -83,7 +83,7 @@ const TaskTable = ({
                             placeholder="Search user..."
                             value={reassignQuery}
                             onChange={(e) => setReassignQuery(e.target.value)}
-                            className="w-full bg-slate-950 border border-white/10 px-2 py-1 rounded text-[11px] outline-none text-white focus:border-cyan-500"
+                            className="w-full bg-slate-950 border border-white/10 px-2 py-1 rounded text-[11px] outline-none text-white focus:border-blue-500"
                           />
                           {isSearchingReassign && (
                             <span className="absolute right-2 top-1 text-[8px] text-slate-500">Searching...</span>

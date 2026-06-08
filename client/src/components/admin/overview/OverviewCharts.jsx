@@ -10,7 +10,7 @@ const OverviewCharts = ({ growth = [] }) => {
   }
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-slate-900/30 p-5 space-y-4">
+    <div className="premium-card premium-card-hover space-y-4">
       <div>
         <h3 className="text-sm font-bold text-white">Platform Registrations Growth</h3>
         <p className="text-[10px] text-slate-500">New user accounts created during the last 7 days.</p>

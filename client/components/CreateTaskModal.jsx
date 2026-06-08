@@ -75,8 +75,8 @@ const CreateTaskModal = ({ isOpen, onClose, boardId, defaultStatus = 'Todo' }) =
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
-      <div className="w-full max-w-xl overflow-hidden rounded-[32px] border border-white/10 bg-slate-900 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
+      <div className="w-full max-w-xl overflow-hidden rounded-3xl border border-white/10 bg-slate-900 shadow-2xl">
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-5 bg-slate-900">
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-sky-400 font-semibold">New Task</p>

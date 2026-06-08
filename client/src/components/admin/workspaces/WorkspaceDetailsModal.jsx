@@ -98,9 +98,9 @@ const WorkspaceDetailsModal = ({
   };
 
   return (
-    <div className="space-y-5 font-sans">
+    <div className="space-y-5 text-xs">
       <div className="flex items-center gap-3.5 border-b border-white/5 pb-3">
-        <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex-shrink-0">
+        <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white font-bold flex-shrink-0">
           <HiOutlineFolder className="h-6 w-6" />
         </span>
         <div className="min-w-0 flex-1">
@@ -234,7 +234,7 @@ const WorkspaceDetailsModal = ({
                     setSelectedForceAddUser(null);
                     setForceAddQuery('');
                   }}
-                  className="px-2.5 py-1 bg-cyan-500 hover:bg-cyan-400 text-slate-955 font-bold text-[10px] rounded-lg transition cursor-pointer"
+                  className="px-2.5 py-1 bg-blue-500 hover:bg-blue-400 text-slate-950 font-bold text-[10px] rounded-lg transition cursor-pointer"
                 >
                   Inject
                 </button>
@@ -252,7 +252,7 @@ const WorkspaceDetailsModal = ({
                 value={forceAddQuery}
                 onChange={(e) => setForceAddQuery(e.target.value)}
                 placeholder="Search user to add..."
-                className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-1.5 text-[11px] outline-none text-white focus:border-cyan-500"
+                className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-1.5 text-[11px] outline-none text-white focus:border-blue-500"
               />
               {isSearchingForceAdd && (
                 <div className="absolute right-3 top-2 text-[9px] text-slate-500">Searching...</div>
@@ -326,7 +326,7 @@ const WorkspaceDetailsModal = ({
                 value={transferQuery}
                 onChange={(e) => setTransferQuery(e.target.value)}
                 placeholder="Search new owner..."
-                className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-1.5 text-[11px] outline-none text-white focus:border-cyan-500"
+                className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-1.5 text-[11px] outline-none text-white focus:border-blue-500"
               />
               {isSearchingTransfer && (
                 <div className="absolute right-3 top-2 text-[9px] text-slate-500">Searching...</div>

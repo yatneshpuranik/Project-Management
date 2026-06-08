@@ -72,7 +72,7 @@ const ProfileScreen = () => {
   };
 
   const isAdmin = user.role === 'ADMIN';
-  const themeColorClass = isAdmin ? 'cyan' : 'sky';
+  const themeColorClass = 'sky';
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 px-4 py-12 sm:px-6 lg:px-8">
@@ -143,8 +143,7 @@ const ProfileScreen = () => {
               <button
                 type="submit"
                 disabled={updating}
-                className={`w-full rounded-2xl text-slate-950 py-3 text-xs font-bold shadow-lg transition disabled:opacity-50 cursor-pointer ${isAdmin ? 'bg-cyan-500 hover:bg-cyan-400 shadow-cyan-500/10' : 'bg-sky-500 hover:bg-sky-400 shadow-sky-500/10'
-                  }`}
+                className="w-full rounded-2xl text-slate-950 py-3 text-xs font-bold shadow-lg transition disabled:opacity-50 cursor-pointer bg-sky-500 hover:bg-sky-400 shadow-sky-500/10"
               >
                 {updating ? 'Saving Changes...' : 'Save Changes'}
               </button>
@@ -162,7 +161,7 @@ const ProfileScreen = () => {
                 </div>
                 <div className="rounded-2xl bg-slate-950/80 p-4 border border-white/5">
                   <p className="text-[10px] text-slate-500 font-bold uppercase">Console Role</p>
-                  <p className={`mt-1.5 text-xs font-bold ${isAdmin ? 'text-cyan-400' : 'text-sky-400'}`}>{user.role}</p>
+                  <p className="mt-1.5 text-xs font-bold text-sky-400">{user.role}</p>
                 </div>
                 <div className="rounded-2xl bg-slate-950/80 p-4 border border-white/5">
                   <p className="text-[10px] text-slate-500 font-bold uppercase">Account Created</p>

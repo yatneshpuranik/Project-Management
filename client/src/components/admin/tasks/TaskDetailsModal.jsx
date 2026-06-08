@@ -2,8 +2,8 @@ const TaskDetailsModal = ({ task, onClose }) => {
   if (!task) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl space-y-4">
+    <div className="premium-modal-backdrop">
+      <div className="premium-modal-container relative space-y-4">
         <div className="flex justify-between items-start">
           <div>
             <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Task Auditor</span>

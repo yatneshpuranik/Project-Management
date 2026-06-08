@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { HiOutlineSearch } from 'react-icons/hi';
 import axiosInstance from '../../../utils/axiosInstance';
 import { toast } from '../../../utils/toast';
 import UsersTable from '../../components/admin/users/UsersTable';
@@ -129,26 +130,29 @@ const AdminUsers = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 text-slate-100 font-sans">
-        <span className="h-6 w-6 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin mr-3" />
+      <div className="flex items-center justify-center py-20 text-slate-100">
+        <span className="h-6 w-6 rounded-full border-2 border-blue-500 border-t-transparent animate-spin mr-3" />
         Loading users...
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 font-sans">
+    <div className="space-y-6">
       <div className="flex items-center justify-between border-b border-white/10 pb-4">
         <div>
           <h2 className="text-xl font-bold text-white">Users Moderation</h2>
           <p className="text-xs text-slate-400">Manage user authorization and platform resource lockouts.</p>
         </div>
-        <input
-          value={userQuery}
-          onChange={(e) => setSearchParams(e.target.value ? { q: e.target.value } : {})}
-          placeholder="Search user profile..."
-          className="rounded-xl border border-white/10 bg-slate-900 px-3.5 py-1.5 text-xs text-white outline-none focus:border-cyan-500 w-72"
-        />
+        <div className="premium-search-container w-72">
+          <HiOutlineSearch className="h-4 w-4 text-slate-500 mr-2 flex-shrink-0" />
+          <input
+            value={userQuery}
+            onChange={(e) => setSearchParams(e.target.value ? { q: e.target.value } : {})}
+            placeholder="Search user profile..."
+            className="premium-search-input"
+          />
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
@@ -160,7 +164,7 @@ const AdminUsers = () => {
           />
         </div>
 
-        <div className="bg-slate-900/30 border border-white/10 rounded-2xl p-5">
+        <div className="premium-card premium-card-hover">
           <UserDetailsModal
             selectedUser={selectedUser}
             selectedUserDetails={selectedUserDetails}

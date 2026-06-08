@@ -11,11 +11,11 @@ const AdminLayout = () => {
   }
 
   return (
-    <div className="h-screen bg-slate-950 text-slate-100 flex flex-col overflow-hidden font-sans">
+    <div className="h-screen bg-slate-950 text-slate-100 flex flex-col overflow-hidden">
       <AdminNavbar />
       <div className="flex-1 flex overflow-hidden">
         <AdminSidebar />
-        <main className="flex-1 bg-slate-950 p-6 overflow-y-auto custom-scrollbar">
+        <main className="flex-1 bg-slate-950/40 p-4 md:p-6 lg:p-8 overflow-y-auto custom-scrollbar">
           <Outlet />
         </main>
       </div>

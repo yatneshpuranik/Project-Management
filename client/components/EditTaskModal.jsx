@@ -112,8 +112,8 @@ const EditTaskModal = ({ isOpen, onClose, task, boardId }) => {
   if (!isOpen || !task) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
-      <div className="w-full max-w-5xl h-[85vh] rounded-[32px] border border-white/10 bg-slate-900 shadow-2xl flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
+      <div className="w-full max-w-5xl h-[85vh] rounded-3xl border border-white/10 bg-slate-900 shadow-2xl flex flex-col overflow-hidden">
         
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 bg-slate-900 flex-shrink-0">

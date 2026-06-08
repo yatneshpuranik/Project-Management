@@ -40,9 +40,9 @@ const UserDetailsModal = ({
   });
 
   return (
-    <div className="space-y-4 font-sans text-xs">
+    <div className="space-y-4 text-xs">
       <div className="flex items-center gap-3.5 border-b border-white/5 pb-3">
-        <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-lg font-bold flex-shrink-0">
+        <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white text-lg font-bold flex-shrink-0">
           {selectedUser.name?.charAt(0).toUpperCase()}
         </span>
         <div className="min-w-0 flex-1">
@@ -58,7 +58,7 @@ const UserDetailsModal = ({
         </p>
         <p className="flex justify-between">
           <span>Role:</span>
-          <span className="font-bold text-cyan-400 uppercase tracking-wide text-[10px] bg-cyan-450/10 border border-cyan-400/20 px-1.5 py-0.2 rounded">
+          <span className="font-bold text-blue-500 uppercase tracking-wide text-[10px] bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.2 rounded">
             {selectedUser.role}
           </span>
         </p>
@@ -117,7 +117,7 @@ const UserDetailsModal = ({
                   <div
                     key={w._id}
                     onClick={() => navigate(`/admin/workspaces?boardId=${w._id}`)}
-                    className="flex justify-between items-center p-2 rounded-xl bg-slate-950/70 border border-white/5 hover:border-cyan-500/30 transition cursor-pointer"
+                    className="flex justify-between items-center p-2 rounded-xl bg-slate-950/70 border border-white/5 hover:border-blue-500/30 transition cursor-pointer"
                   >
                     <span className="truncate max-w-[170px] text-[11px] text-slate-300 font-semibold">{w.title}</span>
                     <span className="text-slate-500 flex items-center gap-0.5 text-[9px] font-black uppercase">
