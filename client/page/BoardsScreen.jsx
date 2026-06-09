@@ -148,6 +148,7 @@ const BoardsScreen = () => {
   const [description, setDescription] = useState('')
   const [isCreating, setIsCreating] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [metricModalType, setMetricModalType] = useState(null)
 
   // Search/Discovery Workspaces State
   const [discoveryQuery, setDiscoveryQuery] = useState('')
@@ -287,8 +288,11 @@ const BoardsScreen = () => {
     socket.emit('workspaceChatJoined', { boardId })
 
     const handleActivityCreated = (data) => {
-      if (data.activity && data.activity.boardId === boardId) {
-        setActivities((prev) => [data.activity, ...prev])
+      if (data.activity) {
+        setActivities((prev) => {
+          if (prev.some(act => act._id === data.activity._id)) return prev
+          return [data.activity, ...prev]
+        })
       }
     }
 
@@ -661,230 +665,226 @@ const BoardsScreen = () => {
     const pendingTasks = globalTasks.filter(t => t.status !== 'Done')
 
     return (
-      <motion.div
-        variants={pageVariants}
-        initial="initial"
-        animate="animate"
-        exit="exit"
-        className="space-y-8 max-w-full"
-      >
-        {/* Dash Header */}
-        <header className="rounded-[24px] border border-white/6 bg-slate-900/40 p-6 backdrop-blur-md relative overflow-hidden">
-          <div className="absolute inset-0 bg-grid opacity-[0.04] pointer-events-none" />
-          <div className="absolute -top-40 -left-40 h-80 w-80 rounded-full bg-violet-500/10 blur-[100px] pointer-events-none" />
-          <div className="absolute -bottom-40 -right-40 h-80 w-80 rounded-full bg-sky-500/10 blur-[100px] pointer-events-none" />
-          
-          <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-400">Workspace Dashboard</p>
-              <h1 className="mt-2 text-3xl font-extrabold text-white tracking-tight">WorkSync Dashboard</h1>
-              <p className="mt-1 text-xs text-slate-400">
-                Review available board workspaces, view team participation, and create new collaborative spaces.
-              </p>
-            </div>
+      <>
+        <motion.div
+          variants={pageVariants}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          className="space-y-8 max-w-full"
+        >
+          {/* Dash Header */}
+          <header className="rounded-[24px] border border-white/6 bg-slate-900/40 p-6 backdrop-blur-md relative overflow-hidden">
+            <div className="absolute inset-0 bg-grid opacity-[0.04] pointer-events-none" />
+            <div className="absolute -top-40 -left-40 h-80 w-80 rounded-full bg-violet-500/10 blur-[100px] pointer-events-none" />
+            <div className="absolute -bottom-40 -right-40 h-80 w-80 rounded-full bg-sky-500/10 blur-[100px] pointer-events-none" />
             
-            <button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="btn-primary self-start lg:self-auto bg-sky-500 hover:bg-violet-600 text-slate-950 hover:text-white flex items-center gap-1.5 transition shadow-lg hover:shadow-violet-500/25"
-            >
-              <HiOutlinePlus className="h-4 w-4" /> Create Board
-            </button>
-          </div>
-        </header>
-
-        {/* Global Statistics Cards */}
-        {globalLoading ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="premium-card animate-shimmer h-28 rounded-2xl border border-white/5 bg-slate-900/40" />
-            ))}
-          </div>
-        ) : (
-          <motion.div
-            variants={staggerContainer}
-            initial="initial"
-            animate="animate"
-            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5"
-          >
-            {[
-              { label: 'Total Workspaces', value: boards.length, color: 'text-sky-400', icon: HiOutlineFolder, gradient: 'from-sky-500/10 to-transparent' },
-              { label: 'Total Tasks', value: globalTasks.length, color: 'text-violet-400', icon: HiOutlineClipboardList, gradient: 'from-violet-500/10 to-transparent' },
-              { label: 'Assigned to Me', value: assignedTasks.length, color: 'text-cyan-400', icon: HiOutlineUserCircle, gradient: 'from-cyan-500/10 to-transparent' },
-              { label: 'Completed Tasks', value: completedTasks.length, color: 'text-emerald-400', icon: HiOutlineBadgeCheck, gradient: 'from-emerald-500/10 to-transparent' },
-              { label: 'Pending Tasks', value: pendingTasks.length, color: 'text-amber-400', icon: HiOutlineClock, gradient: 'from-amber-500/10 to-transparent' },
-            ].map((stat) => {
-              const Icon = stat.icon
-              return (
-                <motion.div
-                  key={stat.label}
-                  variants={fadeInUp}
-                  whileHover={{ y: -4, scale: 1.01, borderColor: 'rgba(56, 189, 248, 0.25)' }}
-                  className="premium-card relative overflow-hidden rounded-2xl border border-white/6 bg-slate-900/60 p-5 backdrop-blur-md flex flex-col justify-between"
-                >
-                  <div className={`absolute inset-0 bg-gradient-to-br ${stat.gradient} opacity-20 pointer-events-none`} />
-                  <div className="flex items-center justify-between text-slate-400 z-10">
-                    <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400">{stat.label}</span>
-                    <Icon className={`h-5 w-5 ${stat.color}`} />
-                  </div>
-                  <div className="mt-4 text-3xl font-extrabold text-white tracking-tight z-10">
-                    <CountUp to={stat.value} />
-                  </div>
-                </motion.div>
-              )
-            })}
-          </motion.div>
-        )}
-
-        {/* Dashboard Content */}
-        <div className="space-y-8">
-          {/* Workspaces list */}
-          <section className="space-y-4">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-450">All Workspaces</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {boards.map((board) => (
-                <motion.div
-                  key={board._id}
-                  variants={fadeInUp}
-                  whileHover={{ y: -4, scale: 1.01, borderColor: 'rgba(56,189,248,0.25)' }}
-                  onClick={() => navigate(`/boards/${board._id}`)}
-                  className="premium-card premium-card-hover group relative flex flex-col justify-between cursor-pointer bg-slate-900/40 hover:bg-slate-900/60"
-                >
-                  <div>
-                    <div className="flex items-center justify-between text-slate-400 mb-3">
-                      <div className="flex items-center gap-2">
-                        <HiOutlineFolder className="h-5 w-5 text-sky-400" />
-                        <span className="text-[10px] uppercase tracking-wider font-semibold">Workspace</span>
-                      </div>
-                    </div>
-                    <h3 className="text-sm font-semibold text-white group-hover:text-sky-400 transition truncate">{board.title}</h3>
-                    <p className="mt-1 text-[11px] text-slate-400 line-clamp-2 leading-relaxed min-h-[32px]">{board.description || 'No description provided.'}</p>
-                  </div>
-
-                  <div className="mt-5 pt-3 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-500">
-                    <div className="flex -space-x-1.5 overflow-hidden">
-                      {board.members?.slice(0, 3).map((member, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-slate-800 to-slate-700 text-white text-[9px] font-bold border border-slate-950"
-                          title={member.name}
-                        >
-                          {member.name?.charAt(0).toUpperCase()}
-                        </span>
-                      ))}
-                      {board.members?.length > 3 && (
-                        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-slate-400 text-[8px] font-semibold border border-slate-950">
-                          +{board.members.length - 3}
-                        </span>
-                      )}
-                    </div>
-                    <span>{board.members?.length || 0} participants</span>
-                  </div>
-                </motion.div>
-              ))}
-
-              <motion.div
-                whileHover={{ y: -4, scale: 1.01 }}
-                onClick={() => setIsCreateModalOpen(true)}
-                className="flex flex-col items-center justify-center rounded-[24px] border border-dashed border-white/10 bg-transparent p-6 hover:border-sky-500/40 hover:bg-sky-500/5 cursor-pointer text-slate-400 hover:text-sky-450 transition duration-200 min-h-[160px]"
-              >
-                <HiOutlinePlus className="h-6 w-6 mb-2 text-slate-450 group-hover:text-sky-400 transition" />
-                <span className="text-xs font-semibold text-slate-350">Add New Workspace</span>
-                <span className="text-[10px] text-slate-500 mt-1">Start tracking boards</span>
-              </motion.div>
-            </div>
-          </section>
-
-          {/* Discovery List */}
-          <section className="space-y-4 pt-4 border-t border-white/5">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-450">Discover Workspaces</h2>
-                <p className="text-[10.5px] text-slate-500">Search and join other public or private workspaces on WorkSync.</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-400">Workspace Dashboard</p>
+                <h1 className="mt-2 text-3xl font-extrabold text-white tracking-tight">WorkSync Dashboard</h1>
+                <p className="mt-1 text-xs text-slate-400">
+                  Review available board workspaces, view team participation, and create new collaborative spaces.
+                </p>
               </div>
               
-              <div className="flex flex-wrap gap-2 w-full md:w-auto">
-                <input
-                  value={discoveryQuery}
-                  onChange={(e) => setDiscoveryQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      searchGlobalWorkspaces(discoveryQuery, discoveryFilter)
-                    }
-                  }}
-                  placeholder="Search workspaces..."
-                  className="rounded-xl border border-white/10 bg-slate-900 px-3.5 py-2 text-xs text-white outline-none focus:border-blue-500 transition w-full sm:w-48"
-                />
-                <select
-                  value={discoveryFilter}
-                  onChange={(e) => setDiscoveryFilter(e.target.value)}
-                  className="rounded-xl border border-white/10 bg-slate-900 px-3.5 py-2 text-xs text-white outline-none focus:border-blue-500 transition cursor-pointer"
-                >
-                  <option value="">All visibility</option>
-                  <option value="public">Public</option>
-                  <option value="private">Private</option>
-                </select>
-                <button
-                  onClick={() => searchGlobalWorkspaces(discoveryQuery, discoveryFilter)}
-                  className="btn-primary text-xs"
-                >
-                  Search
-                </button>
-              </div>
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                className="btn-primary self-start lg:self-auto bg-sky-500 hover:bg-violet-600 text-slate-955 hover:text-white flex items-center gap-1.5 transition shadow-lg hover:shadow-violet-500/25"
+              >
+                <HiOutlinePlus className="h-4 w-4" /> Create Board
+              </button>
             </div>
+          </header>
 
-            {isSearchingWorkspaces ? (
-              <div className="text-center py-10 text-xs text-slate-500">Searching workspaces...</div>
-            ) : discoveryResults.length === 0 ? (
-              <div className="text-center py-10 text-xs text-slate-500 italic bg-slate-900/10 border border-dashed border-white/5 rounded-2xl">
-                No public workspaces found.
-              </div>
-            ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {discoveryResults.map((ws) => (
-                  <div key={ws._id} className="premium-card flex flex-col justify-between p-4 bg-slate-900/30">
-                    <div>
-                      <div className="flex items-center justify-between text-[10px] text-slate-500 mb-3">
-                        <span className="bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded font-bold uppercase">{ws.visibility}</span>
-                        <span>{ws.membersCount || 0} members</span>
-                      </div>
-                      <h3 className="text-sm font-semibold text-white truncate">{ws.title}</h3>
-                      <p className="mt-1 text-[11px] text-slate-400 line-clamp-2 min-h-[32px]">{ws.description}</p>
-                      <p className="text-[10px] text-sky-400 mt-2 font-semibold">Owner: {ws.createdBy?.name || 'Owner'}</p>
+          {/* Global Statistics Cards */}
+          {globalLoading ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="premium-card animate-shimmer h-28 rounded-2xl border border-white/5 bg-slate-900/40" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              {[
+                { id: 'workspaces', label: 'Total Workspaces', value: boards.length, color: 'text-sky-400', icon: HiOutlineFolder, gradient: 'from-sky-500/10 to-transparent' },
+                { id: 'tasks', label: 'Total Tasks', value: globalTasks.length, color: 'text-violet-400', icon: HiOutlineClipboardList, gradient: 'from-violet-500/10 to-transparent' },
+                { id: 'assigned', label: 'Assigned to Me', value: assignedTasks.length, color: 'text-cyan-400', icon: HiOutlineUserCircle, gradient: 'from-cyan-500/10 to-transparent' },
+                { id: 'completed', label: 'Completed Tasks', value: completedTasks.length, color: 'text-emerald-400', icon: HiOutlineBadgeCheck, gradient: 'from-emerald-500/10 to-transparent' },
+                { id: 'pending', label: 'Pending Tasks', value: pendingTasks.length, color: 'text-amber-400', icon: HiOutlineClock, gradient: 'from-amber-500/10 to-transparent' },
+              ].map((stat) => {
+                const Icon = stat.icon
+                return (
+                  <div
+                    key={stat.label}
+                    onClick={() => setMetricModalType(stat.id)}
+                    className="premium-card relative overflow-hidden rounded-2xl border border-white/6 bg-slate-900/60 p-5 backdrop-blur-md flex flex-col justify-between cursor-pointer hover:border-sky-500/25 transition-colors duration-200"
+                  >
+                    <div className={`absolute inset-0 bg-gradient-to-br ${stat.gradient} opacity-20 pointer-events-none`} />
+                    <div className="flex items-center justify-between text-slate-400 z-10">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400">{stat.label}</span>
+                      <Icon className={`h-5 w-5 ${stat.color}`} />
                     </div>
-                    <div className="mt-4 pt-3 border-t border-white/5">
-                      {ws.joinStatus === 'member' ? (
-                        <span className="text-xs text-emerald-400 font-bold">✓ Joined</span>
-                      ) : ws.joinStatus === 'pending' ? (
-                        <span className="text-xs text-amber-400 font-bold italic">⌛ Pending Approval</span>
-                      ) : ws.visibility === 'public' ? (
-                        <button
-                          onClick={() => handleJoinWorkspace(ws._id)}
-                          className="w-full btn-primary text-xs"
-                        >
-                          Join Workspace
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleRequestAccess(ws._id)}
-                          className="w-full btn-primary text-xs"
-                        >
-                          Request Access
-                        </button>
-                      )}
+                    <div className="mt-4 text-3xl font-extrabold text-white tracking-tight z-10">
+                      {stat.value}
                     </div>
                   </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Dashboard Content */}
+          <div className="space-y-8">
+            {/* Workspaces list */}
+            <section className="space-y-4">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-450">All Workspaces</h2>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {boards.map((board) => (
+                  <motion.div
+                    key={board._id}
+                    variants={fadeInUp}
+                    whileHover={{ y: -4, scale: 1.01, borderColor: 'rgba(56,189,248,0.25)' }}
+                    onClick={() => navigate(`/boards/${board._id}`)}
+                    className="premium-card premium-card-hover group relative flex flex-col justify-between cursor-pointer bg-slate-900/40 hover:bg-slate-900/60"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between text-slate-400 mb-3">
+                        <div className="flex items-center gap-2">
+                          <HiOutlineFolder className="h-5 w-5 text-sky-400" />
+                          <span className="text-[10px] uppercase tracking-wider font-semibold">Workspace</span>
+                        </div>
+                      </div>
+                      <h3 className="text-sm font-semibold text-white group-hover:text-sky-400 transition truncate">{board.title}</h3>
+                      <p className="mt-1 text-[11px] text-slate-400 line-clamp-2 leading-relaxed min-h-[32px]">{board.description || 'No description provided.'}</p>
+                    </div>
+
+                    <div className="mt-5 pt-3 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-500">
+                      <div className="flex -space-x-1.5 overflow-hidden">
+                        {board.members?.slice(0, 3).map((member, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-slate-800 to-slate-700 text-white text-[9px] font-bold border border-slate-950"
+                            title={member.name}
+                          >
+                            {member.name?.charAt(0).toUpperCase()}
+                          </span>
+                        ))}
+                        {board.members?.length > 3 && (
+                          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-slate-400 text-[8px] font-semibold border border-slate-955">
+                            +{board.members.length - 3}
+                          </span>
+                        )}
+                      </div>
+                      <span>{board.members?.length || 0} participants</span>
+                    </div>
+                  </motion.div>
                 ))}
+
+                <motion.div
+                  whileHover={{ y: -4, scale: 1.01 }}
+                  onClick={() => setIsCreateModalOpen(true)}
+                  className="flex flex-col items-center justify-center rounded-[24px] border border-dashed border-white/10 bg-transparent p-6 hover:border-sky-500/40 hover:bg-sky-500/5 cursor-pointer text-slate-400 hover:text-sky-450 transition duration-200 min-h-[160px]"
+                >
+                  <HiOutlinePlus className="h-6 w-6 mb-2 text-slate-450 group-hover:text-sky-400 transition" />
+                  <span className="text-xs font-semibold text-slate-350">Add New Workspace</span>
+                  <span className="text-[10px] text-slate-500 mt-1">Start tracking boards</span>
+                </motion.div>
               </div>
-            )}
-          </section>
-        </div>
+            </section>
+
+            {/* Discovery List */}
+            <section className="space-y-4 pt-4 border-t border-white/5">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-450">Discover Workspaces</h2>
+                  <p className="text-[10.5px] text-slate-500">Search and join other public or private workspaces on WorkSync.</p>
+                </div>
+                
+                <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                  <input
+                    value={discoveryQuery}
+                    onChange={(e) => setDiscoveryQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        searchGlobalWorkspaces(discoveryQuery, discoveryFilter)
+                      }
+                    }}
+                    placeholder="Search workspaces..."
+                    className="rounded-xl border border-white/10 bg-slate-900 px-3.5 py-2 text-xs text-white outline-none focus:border-blue-500 transition w-full sm:w-48"
+                  />
+                  <select
+                    value={discoveryFilter}
+                    onChange={(e) => setDiscoveryFilter(e.target.value)}
+                    className="rounded-xl border border-white/10 bg-slate-900 px-3.5 py-2 text-xs text-white outline-none focus:border-blue-500 transition cursor-pointer"
+                  >
+                    <option value="">All visibility</option>
+                    <option value="public">Public</option>
+                    <option value="private">Private</option>
+                  </select>
+                  <button
+                    onClick={() => searchGlobalWorkspaces(discoveryQuery, discoveryFilter)}
+                    className="btn-primary text-xs"
+                  >
+                    Search
+                  </button>
+                </div>
+              </div>
+
+              {isSearchingWorkspaces ? (
+                <div className="text-center py-10 text-xs text-slate-505">Searching workspaces...</div>
+              ) : discoveryResults.length === 0 ? (
+                <div className="text-center py-10 text-xs text-slate-500 italic bg-slate-900/10 border border-dashed border-white/5 rounded-2xl">
+                  No public workspaces found.
+                </div>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {discoveryResults.map((ws) => (
+                    <div key={ws._id} className="premium-card flex flex-col justify-between p-4 bg-slate-900/30">
+                      <div>
+                        <div className="flex items-center justify-between text-[10px] text-slate-500 mb-3">
+                          <span className="bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded font-bold uppercase">{ws.visibility}</span>
+                          <span>{ws.membersCount || 0} members</span>
+                        </div>
+                        <h3 className="text-sm font-semibold text-white truncate">{ws.title}</h3>
+                        <p className="mt-1 text-[11px] text-slate-400 line-clamp-2 min-h-[32px]">{ws.description}</p>
+                        <p className="text-[10px] text-sky-400 mt-2 font-semibold">Owner: {ws.createdBy?.name || 'Owner'}</p>
+                      </div>
+                      <div className="mt-4 pt-3 border-t border-white/5">
+                        {ws.joinStatus === 'member' ? (
+                          <span className="text-xs text-emerald-400 font-bold">✓ Joined</span>
+                        ) : ws.joinStatus === 'pending' ? (
+                          <span className="text-xs text-amber-400 font-bold italic">⌛ Pending Approval</span>
+                        ) : ws.visibility === 'public' ? (
+                          <button
+                            onClick={() => handleJoinWorkspace(ws._id)}
+                            className="w-full btn-primary text-xs"
+                          >
+                            Join Workspace
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleRequestAccess(ws._id)}
+                            className="w-full btn-primary text-xs"
+                          >
+                            Request Access
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+        </motion.div>
 
         {/* Create Board Modal */}
         {isCreateModalOpen && (
           <div className="premium-modal-backdrop">
-            <div className="premium-modal-container relative animate-shimmer">
+            <div className="premium-modal-container relative !animate-none !max-w-[580px] w-full h-auto">
               <h3 className="text-base font-semibold text-white mb-2">Create New Workspace</h3>
-              <p className="text-[11px] text-slate-400 mb-4">Set up board details.</p>
+              <p className="text-[11px] text-slate-450 mb-4">Set up board details.</p>
               
               <form onSubmit={handleCreateBoard} className="space-y-4">
                 <div>
@@ -927,7 +927,117 @@ const BoardsScreen = () => {
             </div>
           </div>
         )}
-      </motion.div>
+
+        {/* Metric Detail Modal */}
+        {metricModalType && (
+          <div className="premium-modal-backdrop" onClick={() => setMetricModalType(null)}>
+            <div className="premium-modal-container relative max-w-lg w-full flex flex-col max-h-[80vh]" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-between items-center pb-3 border-b border-white/10 flex-shrink-0">
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    {metricModalType === 'workspaces' && 'Workspace Directory'}
+                    {metricModalType === 'tasks' && 'All Tasks'}
+                    {metricModalType === 'assigned' && 'Tasks Assigned to Me'}
+                    {metricModalType === 'completed' && 'Completed Tasks'}
+                    {metricModalType === 'pending' && 'Pending Tasks'}
+                  </h3>
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    {metricModalType === 'workspaces' && `Total Workspaces: ${boards.length}`}
+                    {metricModalType === 'tasks' && `Total Tasks: ${globalTasks.length}`}
+                    {metricModalType === 'assigned' && `Assigned Tasks: ${globalTasks.filter(t => t.assignedTo?._id === currentUserId || t.assignedTo === currentUserId || t.assignedTo?.email === localStorage.getItem('userEmail')).length}`}
+                    {metricModalType === 'completed' && `Completed Tasks: ${globalTasks.filter(t => t.status === 'Done').length}`}
+                    {metricModalType === 'pending' && `Pending Tasks: ${globalTasks.filter(t => t.status !== 'Done').length}`}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setMetricModalType(null)}
+                  className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-white/10 text-slate-400 hover:text-white transition hover:bg-white/5"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto mt-4 pr-1 space-y-2 custom-scrollbar">
+                {metricModalType === 'workspaces' && boards.map((b) => (
+                  <div
+                    key={b._id}
+                    onClick={() => {
+                      setMetricModalType(null);
+                      navigate(`/boards/${b._id}`);
+                    }}
+                    className="p-3 bg-slate-900/40 border border-white/5 hover:border-white/15 rounded-xl flex justify-between items-center cursor-pointer transition hover:bg-slate-900/60"
+                  >
+                    <div>
+                      <h4 className="text-xs font-bold text-white truncate max-w-[200px]">{b.title}</h4>
+                      <p className="text-[10px] text-slate-400 truncate max-w-[250px] mt-0.5">{b.description || 'No description'}</p>
+                    </div>
+                    <span className="text-[9px] bg-slate-950 px-2 py-0.5 rounded border border-white/5 font-semibold text-slate-500">
+                      {b.members?.length || 0} members
+                    </span>
+                  </div>
+                ))}
+
+                {metricModalType !== 'workspaces' && (() => {
+                  const userEmail = localStorage.getItem('userEmail') || '';
+                  const list = metricModalType === 'tasks'
+                    ? globalTasks
+                    : metricModalType === 'assigned'
+                      ? globalTasks.filter(t => t.assignedTo?._id === currentUserId || t.assignedTo === currentUserId || t.assignedTo?.email === userEmail)
+                      : metricModalType === 'completed'
+                        ? globalTasks.filter(t => t.status === 'Done')
+                        : globalTasks.filter(t => t.status !== 'Done');
+
+                  if (list.length === 0) {
+                    return <p className="text-xs text-slate-500 italic text-center py-6">No tasks found.</p>;
+                  }
+
+                  return list.map((t) => (
+                    <div
+                      key={t._id}
+                      onClick={() => {
+                        setMetricModalType(null);
+                        navigate(`/boards/${t.boardId?._id || t.boardId}/tasks/${t._id}`);
+                      }}
+                      className="p-3 bg-slate-900/40 border border-white/5 hover:border-white/15 rounded-xl flex justify-between items-center cursor-pointer transition hover:bg-slate-900/60"
+                    >
+                      <div className="min-w-0 flex-1 pr-2">
+                        <h4 className="text-xs font-bold text-white truncate">{t.title}</h4>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[9px] text-slate-505 font-medium">
+                            Board: <span className="text-sky-400">{t.boardId?.title || 'Active Board'}</span>
+                          </span>
+                          {t.dueDate && (
+                            <span className="text-[9px] text-slate-505 font-medium">
+                              Due: <span className="text-slate-450">{new Date(t.dueDate).toLocaleDateString()}</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <span className={`text-[8.5px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                          t.priority === 'High' ? 'bg-rose-500/10 text-rose-400' :
+                          t.priority === 'Medium' ? 'bg-amber-500/10 text-amber-400' :
+                          'bg-slate-800 text-slate-400'
+                        }`}>
+                          {t.priority}
+                        </span>
+                        <span className={`text-[8.5px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                          t.status === 'Done' ? 'bg-emerald-500/10 text-emerald-400' :
+                          t.status === 'Review' ? 'bg-amber-500/10 text-amber-400' :
+                          t.status === 'In Progress' ? 'bg-sky-500/10 text-sky-400' :
+                          'bg-slate-800 text-slate-400'
+                        }`}>
+                          {t.status}
+                        </span>
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
+      </>
     );
   }
 
@@ -976,7 +1086,7 @@ const BoardsScreen = () => {
             <div className="flex-1 min-w-0">
               <Board boardId={boardId} />
             </div>
-            <div className="w-80 border-l border-white/10 flex-shrink-0 hidden lg:block">
+            <div className="w-64 border-l border-white/10 flex-shrink-0 hidden lg:block">
               <ActivityPanel activities={activities} onlineUsers={onlineUsers} />
             </div>
           </div>

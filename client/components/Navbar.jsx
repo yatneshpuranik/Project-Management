@@ -233,16 +233,19 @@ const Navbar = ({ toggleSidebar }) => {
 
     const handleActivityCreated = (data) => {
       const { activity } = data;
-      if (activity && activity.boardId === currentBoard._id) {
-        setNotifications((prev) => [
-          {
-            _id: activity._id,
-            title: activity.type,
-            message: activity.message,
-            createdAt: activity.createdAt,
-          },
-          ...prev,
-        ]);
+      if (activity) {
+        setNotifications((prev) => {
+          if (prev.some((n) => n._id === activity._id)) return prev;
+          return [
+            {
+              _id: activity._id,
+              title: activity.type,
+              message: activity.message,
+              createdAt: activity.createdAt,
+            },
+            ...prev,
+          ];
+        });
       }
     };
 

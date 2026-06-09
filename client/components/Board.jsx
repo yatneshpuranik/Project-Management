@@ -185,23 +185,15 @@ const Board = ({ boardId }) => {
 
       {/* Advanced Filters */}
       <div className="mt-4 rounded-xl border border-white/5 bg-slate-900/20 p-4 flex-shrink-0">
-        <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
-          <div className="w-full lg:max-w-md">
-            <input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search cards..."
-              className="w-full rounded-xl border border-white/10 bg-slate-950/80 px-3.5 py-2 text-xs text-slate-100 placeholder-slate-500 outline-none focus:border-sky-500 transition"
-            />
-          </div>
-
+        <div className="flex flex-col lg:flex-row gap-4 items-center justify-between w-full">
+          {/* Left Side: Filters */}
           <div className="w-full lg:w-auto flex flex-wrap gap-3 items-center">
             <div className="flex items-center gap-2">
               <span className="text-[10px] text-slate-500 uppercase tracking-wider">Priority:</span>
               <select
                 value={priorityFilter}
                 onChange={(e) => setPriorityFilter(e.target.value)}
-                className="rounded-lg border border-white/10 bg-slate-950 px-2 py-1 text-xs text-white outline-none focus:border-sky-500"
+                className="rounded-lg border border-white/10 bg-slate-955 px-2 py-1 text-xs text-white outline-none focus:border-sky-500"
               >
                 <option>All</option>
                 <option>Low</option>
@@ -215,7 +207,7 @@ const Board = ({ boardId }) => {
               <select
                 value={assignedFilter}
                 onChange={(e) => setAssignedFilter(e.target.value)}
-                className="rounded-lg border border-white/10 bg-slate-950 px-2 py-1 text-xs text-white outline-none focus:border-sky-500"
+                className="rounded-lg border border-white/10 bg-slate-955 px-2 py-1 text-xs text-white outline-none focus:border-sky-500"
               >
                 <option>All</option>
                 {uniqueAssignees.map((name) => (
@@ -229,7 +221,7 @@ const Board = ({ boardId }) => {
               <select
                 value={dueFilter}
                 onChange={(e) => setDueFilter(e.target.value)}
-                className="rounded-lg border border-white/10 bg-slate-950 px-2 py-1 text-xs text-white outline-none focus:border-sky-500"
+                className="rounded-lg border border-white/10 bg-slate-955 px-2 py-1 text-xs text-white outline-none focus:border-sky-500"
               >
                 <option>All</option>
                 <option>Today</option>
@@ -237,13 +229,26 @@ const Board = ({ boardId }) => {
                 <option>Overdue</option>
               </select>
             </div>
+          </div>
 
+          {/* Center: Search */}
+          <div className="w-full lg:flex-1 lg:max-w-xs mx-auto">
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search cards..."
+              className="w-full rounded-xl border border-white/10 bg-slate-955/80 px-3.5 py-2 text-xs text-slate-100 placeholder-slate-500 outline-none focus:border-sky-500 transition"
+            />
+          </div>
+
+          {/* Right Side: Create Task */}
+          <div className="w-full lg:w-auto flex justify-end">
             <button
               onClick={() => {
                 setCreateTaskStatus('Todo');
                 setIsCreateModalOpen(true);
               }}
-              className="rounded-xl bg-sky-500 hover:bg-sky-400 text-white px-4 py-2 text-xs font-semibold shadow-md transition ml-auto"
+              className="rounded-xl bg-sky-500 hover:bg-sky-400 text-white px-4 py-2 text-xs font-semibold shadow-md transition"
             >
               + Create Task
             </button>
@@ -252,9 +257,9 @@ const Board = ({ boardId }) => {
       </div>
 
       {/* Horizontally Scrollable Kanban Area */}
-      <div className="mt-4 flex-1 overflow-x-auto flex gap-6 pb-4 pt-1 custom-scrollbar w-full">
+      <div className="mt-4 flex-1 overflow-x-auto flex gap-3 pb-4 pt-1 custom-scrollbar w-full">
         {statuses.map((status) => (
-          <div key={status} className="w-[340px] flex-shrink-0 flex flex-col h-full">
+          <div key={status} className="flex-1 min-w-[200px] flex flex-col h-full">
             <Column
               status={status}
               tasks={filteredTasks.filter((task) => task.status === status)}

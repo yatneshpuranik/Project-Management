@@ -153,10 +153,7 @@ export const createTask = async (req, res) => {
       }
     } catch (err) {}
 
-    res.status(201).json({
-      message: 'Task created successfully',
-      task: sanitizeTask(task, req.user?.role),
-    });
+
 
     // Realtime notification if assignedTo is provided
     if (assignedTo && assignedTo.toString() !== userId) {
@@ -194,9 +191,9 @@ export const createTask = async (req, res) => {
       }
     }
 
-    res.status(201).json({
+    return res.status(201).json({
       message: 'Task created successfully',
-      task: encryptUserIds(task),
+      task: sanitizeTask(task, req.user?.role),
     });
   } catch (error) {
     res.status(500).json({ message: 'Error creating task', error: error.message });
