@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import { pageVariants } from '../../../utils/motion.js';
 import axiosInstance from '../../../utils/axiosInstance';
 import { toast } from '../../../utils/toast';
 import AnalyticsDashboard from '../../components/admin/analytics/AnalyticsDashboard';
@@ -32,9 +34,15 @@ const AdminAnalytics = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <motion.div
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="space-y-6"
+    >
       <AnalyticsDashboard stats={stats} />
-    </div>
+    </motion.div>
   );
 };
 

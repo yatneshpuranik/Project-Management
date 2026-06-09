@@ -390,9 +390,11 @@ const WorkspaceSidePanel = ({ boardId, currentBoard, onSelectTextChannel, active
     return (
       <div key={mId} className="flex items-center gap-3 p-2 rounded-xl bg-slate-900/40 border border-white/5 hover:border-slate-800 transition">
         <div className="relative flex-shrink-0">
-          <span className={`inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br ${getAvatarGradient(member.name)} text-white font-bold text-sm border border-slate-950`}>
-            {initials}
-          </span>
+          <img
+            src={member.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(member.name || '')}`}
+            alt={member.name}
+            className="h-9 w-9 rounded-full object-cover border border-slate-950"
+          />
           <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-slate-950 ${statusColor}`} />
         </div>
         <div className="flex-1 min-w-0">

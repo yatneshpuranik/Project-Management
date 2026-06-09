@@ -30,7 +30,8 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const isLoginRequest = error.config?.url && (error.config.url.endsWith('/user/login') || error.config.url.endsWith('user/login'));
+    if (error.response?.status === 401 && !isLoginRequest) {
       localStorage.removeItem('token');
       try {
         axios.post(`${BASE_URL}/api/user/logout`, {}, { withCredentials: true }).catch(() => {})

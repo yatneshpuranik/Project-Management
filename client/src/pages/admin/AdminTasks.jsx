@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { pageVariants } from '../../../utils/motion.js';
 import { HiOutlineSearch } from 'react-icons/hi';
 import axiosInstance from '../../../utils/axiosInstance';
 import { toast } from '../../../utils/toast';
@@ -73,7 +75,13 @@ const AdminTasks = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <motion.div
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="space-y-6"
+    >
       <div className="flex items-center justify-between border-b border-white/10 pb-4">
         <div>
           <h2 className="text-xl font-bold text-white">Tasks Directory</h2>
@@ -105,7 +113,7 @@ const AdminTasks = () => {
           onClose={() => setSelectedTask(null)}
         />
       )}
-    </div>
+    </motion.div>
   );
 };
 

@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import { pageVariants } from '../../../utils/motion.js';
 import axiosInstance from '../../../utils/axiosInstance';
 import SecurityCenter from '../../components/admin/security/SecurityCenter';
 import AuditLogs from '../../components/admin/security/AuditLogs';
@@ -63,7 +65,13 @@ const AdminSecurity = ({ view = 'security' }) => {
   }
 
   return (
-    <div className="space-y-6">
+    <motion.div
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="space-y-6"
+    >
       {view === 'security' && (
         <SecurityCenter securitySummary={securitySummary} />
       )}
@@ -100,7 +108,7 @@ const AdminSecurity = ({ view = 'security' }) => {
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 };
 

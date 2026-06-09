@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { pageVariants } from '../utils/motion.js';
 import { fetchBoards } from '../redux/boardSlice';
 import axiosInstance from '../utils/axiosInstance';
 import { HiOutlineTrendingUp, HiOutlineChartBar, HiOutlineCheckCircle, HiOutlineClock, HiOutlineChevronDown } from 'react-icons/hi';
@@ -115,12 +117,19 @@ const AnalyticsScreen = () => {
   const lowRotation = ((highPct + medPct) / 100) * 360;
 
   return (
-    <div className="space-y-6">
+    <motion.div
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="space-y-6"
+    >
       {/* Header Block */}
-      <header className="rounded-2xl border border-white/10 bg-slate-900/40 p-6 backdrop-blur-md flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      {/* Header Block */}
+      <header className="rounded-[24px] border border-white/6 bg-slate-900/40 p-6 backdrop-blur-md flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-sky-400">Workspace Analytics</p>
-          <h1 className="mt-2 text-3xl font-semibold text-white">Performance Metrics</h1>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-400">Workspace Analytics</p>
+          <h1 className="mt-2 text-3xl font-extrabold text-white tracking-tight">Performance Metrics</h1>
           <p className="mt-1 text-xs text-slate-400">
             Track sprint progress, task velocity, cycle time, and workload distribution.
           </p>
@@ -131,7 +140,7 @@ const AnalyticsScreen = () => {
           <select
             value={selectedBoardId}
             onChange={(e) => setSelectedBoardId(e.target.value)}
-            className="w-full appearance-none rounded-xl border border-white/10 bg-slate-950 px-4 py-2.5 pr-10 text-xs text-white outline-none focus:border-sky-500 transition cursor-pointer font-semibold"
+            className="w-full appearance-none rounded-xl border border-white/6 bg-slate-950 px-4 py-2.5 pr-10 text-xs text-white outline-none focus:border-sky-500 transition cursor-pointer font-semibold"
           >
             {boards.map((board) => (
               <option key={board._id} value={board._id}>
@@ -144,7 +153,7 @@ const AnalyticsScreen = () => {
       </header>
 
       {analytics && analytics.totalTasks === 0 ? (
-        <div className="rounded-[32px] border border-dashed border-white/10 bg-slate-900/20 p-12 text-center text-slate-300 shadow-2xl backdrop-blur-sm">
+        <div className="rounded-[32px] border border-dashed border-white/6 bg-slate-900/20 p-12 text-center text-slate-350 shadow-2xl backdrop-blur-sm">
           <p className="text-base font-semibold text-white">No tasks in this workspace</p>
           <p className="mt-2 text-xs text-slate-400">Add tasks in the WorkSync workspace to start calculating metrics.</p>
         </div>
@@ -153,48 +162,48 @@ const AnalyticsScreen = () => {
           <>
             {/* Stats Cards */}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-2xl border border-white/10 bg-slate-900/20 p-5 backdrop-blur-sm">
+              <div className="premium-card premium-card-hover">
                 <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-xs font-medium uppercase tracking-wider">Completion Rate</span>
-                  <HiOutlineCheckCircle className="h-5 w-5 text-emerald-400" />
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.2em]">Completion Rate</span>
+                  <HiOutlineCheckCircle className="h-5 w-5 text-[#14F195]" />
                 </div>
                 <div className="mt-4 flex items-baseline gap-2">
-                  <span className="text-3xl font-semibold text-white">{analytics.completionRate}%</span>
+                  <span className="text-3xl font-extrabold text-white tracking-tight">{analytics.completionRate}%</span>
                 </div>
                 <p className="mt-1 text-[10px] text-slate-500">Tasks completed this sprint</p>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-slate-900/20 p-5 backdrop-blur-sm">
+              <div className="premium-card premium-card-hover">
                 <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-xs font-medium uppercase tracking-wider">Avg. Velocity</span>
-                  <HiOutlineTrendingUp className="h-5 w-5 text-sky-400" />
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.2em]">Avg. Velocity</span>
+                  <HiOutlineTrendingUp className="h-5 w-5 text-[#39BDF8]" />
                 </div>
                 <div className="mt-4 flex items-baseline gap-2">
-                  <span className="text-3xl font-semibold text-white">{analytics.velocity}</span>
-                  <span className="text-xs text-sky-400 font-semibold">tasks/week</span>
+                  <span className="text-3xl font-extrabold text-white tracking-tight">{analytics.velocity}</span>
+                  <span className="text-xs text-[#39BDF8] font-semibold">tasks/week</span>
                 </div>
                 <p className="mt-1 text-[10px] text-slate-500">Story points completed avg</p>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-slate-900/20 p-5 backdrop-blur-sm">
+              <div className="premium-card premium-card-hover">
                 <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-xs font-medium uppercase tracking-wider">Cycle Time</span>
-                  <HiOutlineClock className="h-5 w-5 text-purple-400" />
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.2em]">Cycle Time</span>
+                  <HiOutlineClock className="h-5 w-5 text-[#8B5CF6]" />
                 </div>
                 <div className="mt-4 flex items-baseline gap-2">
-                  <span className="text-3xl font-semibold text-white">{analytics.cycleTime}d</span>
+                  <span className="text-3xl font-extrabold text-white tracking-tight">{analytics.cycleTime}d</span>
                 </div>
                 <p className="mt-1 text-[10px] text-slate-500">From creation to completion</p>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-slate-900/20 p-5 backdrop-blur-sm">
+              <div className="premium-card premium-card-hover">
                 <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-xs font-medium uppercase tracking-wider">Active Backlog</span>
-                  <HiOutlineChartBar className="h-5 w-5 text-amber-400" />
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.2em]">Active Backlog</span>
+                  <HiOutlineChartBar className="h-5 w-5 text-[#F59E0B]" />
                 </div>
                 <div className="mt-4 flex items-baseline gap-2">
-                  <span className="text-3xl font-semibold text-white">{analytics.activeBacklog}</span>
-                  <span className="text-xs text-amber-400 font-semibold">tasks left</span>
+                  <span className="text-3xl font-extrabold text-white tracking-tight">{analytics.activeBacklog}</span>
+                  <span className="text-xs text-[#F59E0B] font-semibold">tasks left</span>
                 </div>
                 <p className="mt-1 text-[10px] text-slate-500">Currently in Todo / Progress</p>
               </div>
@@ -203,7 +212,7 @@ const AnalyticsScreen = () => {
             {/* Visual Analytics Charts Grid */}
             <div className="grid gap-6 lg:grid-cols-3">
               {/* Sprint Burn Down (Line Chart) */}
-              <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-slate-900/20 p-5 backdrop-blur-sm flex flex-col justify-between">
+              <div className="lg:col-span-2 premium-card flex flex-col justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-white">Sprint Burn Down</h3>
                   <p className="text-[10px] text-slate-400">Remaining effort compared to guidelines.</p>
@@ -259,32 +268,32 @@ const AnalyticsScreen = () => {
                         x={getX(idx)}
                         y="195"
                         textAnchor="middle"
-                        className="fill-slate-500 text-[9px] font-medium"
+                        className="fill-slate-550 text-[9px] font-medium"
                       >
                         {d.dayLabel}
                       </text>
                     ))}
 
                     {/* Y-axis Labels */}
-                    <text x="30" y="24" textAnchor="end" className="fill-slate-500 text-[9px] font-medium">{maxVal}</text>
-                    <text x="30" y="104" textAnchor="end" className="fill-slate-500 text-[9px] font-medium">{Math.round(maxVal / 2)}</text>
-                    <text x="30" y="184" textAnchor="end" className="fill-slate-500 text-[9px] font-medium">0</text>
+                    <text x="30" y="24" textAnchor="end" className="fill-slate-550 text-[9px] font-medium">{maxVal}</text>
+                    <text x="30" y="104" textAnchor="end" className="fill-slate-550 text-[9px] font-medium">{Math.round(maxVal / 2)}</text>
+                    <text x="30" y="184" textAnchor="end" className="fill-slate-550 text-[9px] font-medium">0</text>
 
                     {/* Chart Gradients */}
                     <defs>
                       <linearGradient id="lineGradient" x1="0" y1="0" x2="1" y2="0">
                         <stop offset="0%" stopColor="#38bdf8" />
-                        <stop offset="100%" stopColor="#4f46e5" />
+                        <stop offset="100%" stopColor="#8c5cf6" />
                       </linearGradient>
                       <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#38bdf8" />
-                        <stop offset="100%" stopColor="#0f172a" />
+                        <stop offset="100%" stopColor="#070b14" />
                       </linearGradient>
                     </defs>
 
                     {/* Axes & Grid Lines */}
-                    <line x1="40" y1="180" x2="460" y2="180" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-                    <line x1="40" y1="20" x2="40" y2="180" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+                    <line x1="40" y1="180" x2="460" y2="180" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+                    <line x1="40" y1="20" x2="40" y2="180" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
                   </svg>
 
                   {/* Legend overlay */}
@@ -296,7 +305,7 @@ const AnalyticsScreen = () => {
               </div>
 
               {/* Task Allocations (Circle Progress Chart) */}
-              <div className="rounded-2xl border border-white/10 bg-slate-900/20 p-5 backdrop-blur-sm flex flex-col justify-between">
+              <div className="premium-card flex flex-col justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-white">Workload Distribution</h3>
                   <p className="text-[10px] text-slate-400">Tasks allocation by priority.</p>
@@ -309,20 +318,20 @@ const AnalyticsScreen = () => {
 
                     {/* High Priority (Red) */}
                     {highPct > 0 && (
-                      <circle cx="80" cy="80" r="65" stroke="#f43f5e" strokeWidth="16" fill="transparent"
+                      <circle cx="80" cy="80" r="65" stroke="#EF4444" strokeWidth="16" fill="transparent"
                         strokeDasharray={circumference} strokeDashoffset={highOffset} strokeLinecap="round" />
                     )}
 
                     {/* Medium Priority (Yellow) */}
                     {medPct > 0 && (
-                      <circle cx="80" cy="80" r="65" stroke="#eab308" strokeWidth="16" fill="transparent"
+                      <circle cx="80" cy="80" r="65" stroke="#F59E0B" strokeWidth="16" fill="transparent"
                         strokeDasharray={circumference} strokeDashoffset={medOffset}
                         className="transform origin-center" style={{ transform: `rotate(${medRotation}deg)` }} strokeLinecap="round" />
                     )}
 
                     {/* Low Priority (Green) */}
                     {lowPct > 0 && (
-                      <circle cx="80" cy="80" r="65" stroke="#10b981" strokeWidth="16" fill="transparent"
+                      <circle cx="80" cy="80" r="65" stroke="#14F195" strokeWidth="16" fill="transparent"
                         strokeDasharray={circumference} strokeDashoffset={lowOffset}
                         className="transform origin-center" style={{ transform: `rotate(${lowRotation}deg)` }} strokeLinecap="round" />
                     )}
@@ -331,22 +340,22 @@ const AnalyticsScreen = () => {
                   {/* Center label */}
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <span className="text-2xl font-bold text-white">{analytics.workloadDistribution.totalAssigned}</span>
-                    <span className="text-[9px] text-slate-400">Assigned Tasks</span>
+                    <span className="text-[9px] text-slate-500 uppercase tracking-wider">Assigned</span>
                   </div>
                 </div>
 
                 {/* Priority Legend */}
                 <div className="mt-4 grid grid-cols-3 gap-2 text-[10px] text-slate-400 text-center">
-                  <div className="rounded-lg bg-slate-900/50 p-2 border border-white/5">
-                    <span className="block h-2 w-2 rounded-full bg-rose-500 mx-auto mb-1"></span>
+                  <div className="rounded-xl bg-slate-900/40 p-2 border border-white/6">
+                    <span className="block h-2 w-2 rounded-full bg-[#EF4444] mx-auto mb-1"></span>
                     <span className="font-semibold text-white">{highPct}% High</span>
                   </div>
-                  <div className="rounded-lg bg-slate-900/50 p-2 border border-white/5">
-                    <span className="block h-2 w-2 rounded-full bg-amber-500 mx-auto mb-1"></span>
+                  <div className="rounded-xl bg-slate-900/40 p-2 border border-white/6">
+                    <span className="block h-2 w-2 rounded-full bg-[#F59E0B] mx-auto mb-1"></span>
                     <span className="font-semibold text-white">{medPct}% Med</span>
                   </div>
-                  <div className="rounded-lg bg-slate-900/50 p-2 border border-white/5">
-                    <span className="block h-2 w-2 rounded-full bg-emerald-500 mx-auto mb-1"></span>
+                  <div className="rounded-xl bg-slate-900/40 p-2 border border-white/6">
+                    <span className="block h-2 w-2 rounded-full bg-[#14F195] mx-auto mb-1"></span>
                     <span className="font-semibold text-white">{lowPct}% Low</span>
                   </div>
                 </div>
@@ -355,7 +364,7 @@ const AnalyticsScreen = () => {
           </>
         )
       )}
-    </div>
+    </motion.div>
   );
 };
 

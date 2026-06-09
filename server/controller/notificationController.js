@@ -355,3 +355,41 @@ export const markNotificationAsRead = async (req, res) => {
     res.status(500).json({ message: 'Error marking notification as read', error: error.message });
   }
 };
+
+// Delete a notification
+export const deleteNotification = async (req, res) => {
+  try {
+    const { notificationId } = req.params;
+    const userId = req.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(notificationId)) {
+      return res.status(400).json({ message: 'Invalid notification ID format' });
+    }
+
+    const notification = await Notification.findById(notificationId);
+    if (!notification) {
+      return res.status(404).json({ message: 'Notification not found' });
+    }
+
+    if (notification.recipient.toString() !== userId) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    await Notification.findByIdAndDelete(notificationId);
+
+    res.status(200).json({ message: 'Notification deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error deleting notification', error: error.message });
+  }
+};
+
+// Delete all notifications for current user
+export const deleteAllNotifications = async (req, res) => {
+  try {
+    const userId = req.userId;
+    await Notification.deleteMany({ recipient: userId });
+    res.status(200).json({ message: 'All notifications deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error deleting all notifications', error: error.message });
+  }
+};

@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import {
   fetchBoards,
   fetchBoardById,
@@ -12,7 +13,9 @@ import {
 } from '../redux/boardSlice.js'
 import { fetchTasksByBoard } from '../redux/taskSlice.js'
 import Board from '../components/Board.jsx'
+import ActivityPanel from '../components/ActivityPanel.jsx'
 import TaskDetailsDrawer from '../components/TaskDetailsDrawer.jsx'
+import CommentsModal from '../components/CommentsModal.jsx'
 import ChatDrawer from '../components/ChatDrawer.jsx'
 import axiosInstance from '../utils/axiosInstance'
 import socket from '../utils/socket'
@@ -62,18 +65,69 @@ const DisconnectIcon = () => (
   </svg>
 )
 
+import {
+  pageVariants,
+  staggerContainer,
+  fadeInUp,
+  hoverLift
+} from '../utils/motion.js'
+import {
+  HiOutlineCalendar,
+  HiOutlineMenuAlt4,
+  HiOutlineViewGrid,
+  HiOutlineBadgeCheck,
+  HiOutlineClipboardList
+} from 'react-icons/hi'
+
+const CountUp = ({ to }) => {
+  const [val, setVal] = useState(0)
+  useEffect(() => {
+    let start = 0
+    const end = parseInt(to, 10) || 0
+    if (start === end) {
+      setVal(end)
+      return
+    }
+    const duration = 650
+    const steps = Math.min(end, 25)
+    const stepTime = Math.floor(duration / steps) || 20
+    const increment = Math.ceil(end / steps) || 1
+    const timer = setInterval(() => {
+      start += increment
+      if (start >= end) {
+        setVal(end)
+        clearInterval(timer)
+      } else {
+        setVal(start)
+      }
+    }, stepTime)
+    return () => clearInterval(timer)
+  }, [to])
+  return <span>{val}</span>
+}
+
 const BoardsScreen = () => {
   const dispatch = useDispatch()
   const navigate = useNavigate()
   const { boardId, taskId } = useParams()
+  const [searchParams] = useSearchParams()
+  const commentsTaskId = searchParams.get('comments')
   const { boards, currentBoard } = useSelector((state) => state.boards)
-  const { tasks } = useSelector((state) => state.tasks)
+  const { tasks, onlineUsers } = useSelector((state) => state.tasks)
   
   const currentUserId = localStorage.getItem('userId')
   const currentUserName = localStorage.getItem('userName') || 'You'
 
   // Tabs navigation state
   const [activeTab, setActiveTab] = useState('dashboard')
+
+  // Global Landing dashboard states
+  const [globalTasks, setGlobalTasks] = useState([])
+  const [globalActivities, setGlobalActivities] = useState([])
+  const [globalLoading, setGlobalLoading] = useState(false)
+
+  // Active workspace View modes
+  const [viewMode, setViewMode] = useState('board') // 'board', 'list', 'calendar'
 
   // Activities logs state
   const [activities, setActivities] = useState([])
@@ -119,6 +173,36 @@ const BoardsScreen = () => {
   useEffect(() => {
     dispatch(fetchBoards())
   }, [dispatch])
+
+  useEffect(() => {
+    if (!boardId && boards.length > 0) {
+      setGlobalLoading(true)
+      const fetchGlobalData = async () => {
+        try {
+          const taskPromises = boards.map(b => axiosInstance.get(`/tasks/board/${b._id}`))
+          const activityPromises = boards.map(b => axiosInstance.get(`/activity/board/${b._id}`))
+          
+          const [taskResponses, activityResponses] = await Promise.all([
+            Promise.all(taskPromises),
+            Promise.all(activityPromises)
+          ])
+          
+          const allTasks = taskResponses.flatMap(res => res.data.tasks || [])
+          const allActivities = activityResponses.flatMap(res => res.data.activities || [])
+          
+          allActivities.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+          
+          setGlobalTasks(allTasks)
+          setGlobalActivities(allActivities.slice(0, 15))
+        } catch (err) {
+          console.error('Error fetching global dashboard data:', err)
+        } finally {
+          setGlobalLoading(false)
+        }
+      }
+      fetchGlobalData()
+    }
+  }, [boardId, boards])
 
   useEffect(() => {
     if (boardId) {
@@ -536,187 +620,269 @@ const BoardsScreen = () => {
     return list
   }, [currentBoard, workspaceOwner])
 
+  const calendarDays = useMemo(() => {
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = today.getMonth()
+    
+    const firstDay = new Date(year, month, 1)
+    const lastDay = new Date(year, month + 1, 0)
+    
+    const startDate = new Date(firstDay)
+    startDate.setDate(startDate.getDate() - startDate.getDay())
+    
+    const endDate = new Date(lastDay)
+    endDate.setDate(endDate.getDate() + (6 - endDate.getDay()))
+    
+    const days = []
+    const temp = new Date(startDate)
+    while (temp <= endDate) {
+      days.push(new Date(temp))
+      temp.setDate(temp.getDate() + 1)
+    }
+    return days
+  }, [])
+
+  const getTasksForDay = (day) => {
+    return tasks.filter(t => {
+      if (!t.dueDate) return false
+      const dDate = new Date(t.dueDate)
+      return dDate.getDate() === day.getDate() &&
+             dDate.getMonth() === day.getMonth() &&
+             dDate.getFullYear() === day.getFullYear()
+    })
+  }
+
   // 1. Dashboard Landing (If no board selected)
   if (!boardId) {
+    const userEmail = localStorage.getItem('userEmail') || ''
+    const assignedTasks = globalTasks.filter(t => t.assignedTo?._id === currentUserId || t.assignedTo === currentUserId || t.assignedTo?.email === userEmail)
+    const completedTasks = globalTasks.filter(t => t.status === 'Done')
+    const pendingTasks = globalTasks.filter(t => t.status !== 'Done')
+
     return (
-      <div className="space-y-8 max-w-full">
+      <motion.div
+        variants={pageVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        className="space-y-8 max-w-full"
+      >
         {/* Dash Header */}
-        <header className="rounded-2xl border border-white/10 bg-slate-900/40 p-6 backdrop-blur-md">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <header className="rounded-[24px] border border-white/6 bg-slate-900/40 p-6 backdrop-blur-md relative overflow-hidden">
+          <div className="absolute inset-0 bg-grid opacity-[0.04] pointer-events-none" />
+          <div className="absolute -top-40 -left-40 h-80 w-80 rounded-full bg-violet-500/10 blur-[100px] pointer-events-none" />
+          <div className="absolute -bottom-40 -right-40 h-80 w-80 rounded-full bg-sky-500/10 blur-[100px] pointer-events-none" />
+          
+          <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400">Workspace Dashboard</p>
-              <h1 className="mt-2 text-3xl font-semibold text-white">WorkSync Dashboard</h1>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-400">Workspace Dashboard</p>
+              <h1 className="mt-2 text-3xl font-extrabold text-white tracking-tight">WorkSync Dashboard</h1>
               <p className="mt-1 text-xs text-slate-400">
                 Review available board workspaces, view team participation, and create new collaborative spaces.
               </p>
             </div>
             
-            <div className="flex gap-4">
-              <div className="rounded-xl bg-slate-900/60 border border-white/5 px-4 py-2 text-center">
-                <span className="text-[9px] uppercase tracking-wider text-slate-500 block">Total Boards</span>
-                <span className="text-xl font-bold text-white mt-1 block">{boards.length}</span>
-              </div>
-              <div className="rounded-xl bg-slate-900/60 border border-white/5 px-4 py-2 text-center">
-                <span className="text-[9px] uppercase tracking-wider text-slate-500 block">Collaboration Status</span>
-                <span className="text-xl font-bold text-sky-400 mt-1 block flex items-center gap-1 justify-center">
-                  <HiOutlineSparkles className="h-4 w-4" /> Active
-                </span>
-              </div>
-            </div>
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="btn-primary self-start lg:self-auto bg-sky-500 hover:bg-violet-600 text-slate-950 hover:text-white flex items-center gap-1.5 transition shadow-lg hover:shadow-violet-500/25"
+            >
+              <HiOutlinePlus className="h-4 w-4" /> Create Board
+            </button>
           </div>
         </header>
 
-        {/* Boards Grid */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400">All Workspaces</h2>
-            <button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="btn-primary"
-            >
-              <HiOutlinePlus className="h-4 w-4 mr-1.5" /> Create Board
-            </button>
-          </div>
-
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {boards.map((board) => (
-              <div
-                key={board._id}
-                onClick={() => navigate(`/boards/${board._id}`)}
-                className="premium-card premium-card-hover group relative flex flex-col justify-between cursor-pointer"
-              >
-                <div>
-                  <div className="flex items-center justify-between text-slate-400 mb-3">
-                    <div className="flex items-center gap-2">
-                      <HiOutlineFolder className="h-5 w-5 text-blue-500" />
-                      <span className="text-[10px] uppercase tracking-wider font-semibold">Workspace</span>
-                    </div>
-                  </div>
-                  <h3 className="text-sm font-semibold text-white group-hover:text-blue-500 transition truncate">{board.title}</h3>
-                  <p className="mt-1 text-[11px] text-slate-400 line-clamp-2 leading-relaxed min-h-[32px]">{board.description || 'No description provided.'}</p>
-                </div>
-
-                <div className="mt-5 pt-3 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-500">
-                  <div className="flex -space-x-1.5 overflow-hidden">
-                    {board.members?.slice(0, 3).map((member, idx) => (
-                      <span
-                        key={idx}
-                        className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-gradient-to-br from-slate-800 to-slate-700 text-white text-[9px] font-bold border border-slate-950"
-                        title={member.name}
-                      >
-                        {member.name?.charAt(0).toUpperCase()}
-                      </span>
-                    ))}
-                    {board.members?.length > 3 && (
-                      <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-slate-800 text-slate-400 text-[8px] font-semibold border border-slate-950">
-                        +{board.members.length - 3}
-                      </span>
-                    )}
-                  </div>
-                  <span>{board.members?.length || 0} participants</span>
-                </div>
-              </div>
+        {/* Global Statistics Cards */}
+        {globalLoading ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="premium-card animate-shimmer h-28 rounded-2xl border border-white/5 bg-slate-900/40" />
             ))}
-
-            <div
-              onClick={() => setIsCreateModalOpen(true)}
-              className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-transparent p-6 hover:border-blue-500/40 hover:bg-blue-600/5 cursor-pointer text-slate-400 hover:text-blue-500 transition duration-200 min-h-[160px]"
-            >
-              <HiOutlinePlus className="h-6 w-6 mb-2 text-slate-500 group-hover:text-blue-500 transition" />
-              <span className="text-xs font-semibold text-slate-300">Add New Workspace</span>
-              <span className="text-[10px] text-slate-500 mt-1">Start tracking dynamic boards</span>
-            </div>
           </div>
-        </section>
+        ) : (
+          <motion.div
+            variants={staggerContainer}
+            initial="initial"
+            animate="animate"
+            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5"
+          >
+            {[
+              { label: 'Total Workspaces', value: boards.length, color: 'text-sky-400', icon: HiOutlineFolder, gradient: 'from-sky-500/10 to-transparent' },
+              { label: 'Total Tasks', value: globalTasks.length, color: 'text-violet-400', icon: HiOutlineClipboardList, gradient: 'from-violet-500/10 to-transparent' },
+              { label: 'Assigned to Me', value: assignedTasks.length, color: 'text-cyan-400', icon: HiOutlineUserCircle, gradient: 'from-cyan-500/10 to-transparent' },
+              { label: 'Completed Tasks', value: completedTasks.length, color: 'text-emerald-400', icon: HiOutlineBadgeCheck, gradient: 'from-emerald-500/10 to-transparent' },
+              { label: 'Pending Tasks', value: pendingTasks.length, color: 'text-amber-400', icon: HiOutlineClock, gradient: 'from-amber-500/10 to-transparent' },
+            ].map((stat) => {
+              const Icon = stat.icon
+              return (
+                <motion.div
+                  key={stat.label}
+                  variants={fadeInUp}
+                  whileHover={{ y: -4, scale: 1.01, borderColor: 'rgba(56, 189, 248, 0.25)' }}
+                  className="premium-card relative overflow-hidden rounded-2xl border border-white/6 bg-slate-900/60 p-5 backdrop-blur-md flex flex-col justify-between"
+                >
+                  <div className={`absolute inset-0 bg-gradient-to-br ${stat.gradient} opacity-20 pointer-events-none`} />
+                  <div className="flex items-center justify-between text-slate-400 z-10">
+                    <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400">{stat.label}</span>
+                    <Icon className={`h-5 w-5 ${stat.color}`} />
+                  </div>
+                  <div className="mt-4 text-3xl font-extrabold text-white tracking-tight z-10">
+                    <CountUp to={stat.value} />
+                  </div>
+                </motion.div>
+              )
+            })}
+          </motion.div>
+        )}
 
-        {/* Discovery Section */}
-        <section className="space-y-4 pt-4 border-t border-white/5">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400">Discover Workspaces</h2>
-              <p className="text-[11px] text-slate-500">Search and join other public or private workspaces on WorkSync.</p>
-            </div>
-            
-            <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-              <input
-                value={discoveryQuery}
-                onChange={(e) => setDiscoveryQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    searchGlobalWorkspaces(discoveryQuery, discoveryFilter)
-                  }
-                }}
-                placeholder="Search workspaces..."
-                className="rounded-xl border border-white/10 bg-slate-900 px-3.5 py-2 text-xs text-white outline-none focus:border-blue-500 transition w-full sm:w-60"
-              />
-              <select
-                value={discoveryFilter}
-                onChange={(e) => setDiscoveryFilter(e.target.value)}
-                className="rounded-xl border border-white/10 bg-slate-900 px-3.5 py-2 text-xs text-white outline-none focus:border-blue-500 transition cursor-pointer"
-              >
-                <option value="">All Workspaces</option>
-                <option value="public">Public</option>
-                <option value="private">Private</option>
-              </select>
-              <button
-                onClick={() => searchGlobalWorkspaces(discoveryQuery, discoveryFilter)}
-                className="btn-primary"
-              >
-                Search
-              </button>
-            </div>
-          </div>
-
-          {isSearchingWorkspaces ? (
-            <div className="text-center py-10 text-xs text-slate-500">Searching workspaces...</div>
-          ) : discoveryResults.length === 0 ? (
-            <div className="text-center py-10 text-xs text-slate-500 italic bg-slate-900/10 border border-dashed border-white/5 rounded-2xl">
-              No public workspaces found.
-            </div>
-          ) : (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {discoveryResults.map((ws) => (
-                <div key={ws._id} className="premium-card premium-card-hover flex flex-col justify-between">
+        {/* Dashboard Content */}
+        <div className="space-y-8">
+          {/* Workspaces list */}
+          <section className="space-y-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-450">All Workspaces</h2>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {boards.map((board) => (
+                <motion.div
+                  key={board._id}
+                  variants={fadeInUp}
+                  whileHover={{ y: -4, scale: 1.01, borderColor: 'rgba(56,189,248,0.25)' }}
+                  onClick={() => navigate(`/boards/${board._id}`)}
+                  className="premium-card premium-card-hover group relative flex flex-col justify-between cursor-pointer bg-slate-900/40 hover:bg-slate-900/60"
+                >
                   <div>
-                    <div className="flex items-center justify-between text-[10px] text-slate-500 mb-3">
-                      <span className="bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded font-bold uppercase">{ws.visibility}</span>
-                      <span>{ws.membersCount || 0} members</span>
+                    <div className="flex items-center justify-between text-slate-400 mb-3">
+                      <div className="flex items-center gap-2">
+                        <HiOutlineFolder className="h-5 w-5 text-sky-400" />
+                        <span className="text-[10px] uppercase tracking-wider font-semibold">Workspace</span>
+                      </div>
                     </div>
-                    <h3 className="text-sm font-semibold text-white truncate">{ws.title}</h3>
-                    <p className="mt-1 text-[11px] text-slate-400 line-clamp-2 min-h-[32px]">{ws.description}</p>
-                    <p className="text-[10.5px] text-sky-400 mt-2.5 font-semibold">Owner: {ws.createdBy?.name || 'Owner'}</p>
+                    <h3 className="text-sm font-semibold text-white group-hover:text-sky-400 transition truncate">{board.title}</h3>
+                    <p className="mt-1 text-[11px] text-slate-400 line-clamp-2 leading-relaxed min-h-[32px]">{board.description || 'No description provided.'}</p>
                   </div>
-                  <div className="mt-5 pt-3 border-t border-white/5">
-                    {ws.joinStatus === 'member' ? (
-                      <span className="text-xs text-emerald-400 font-bold">✓ Joined</span>
-                    ) : ws.joinStatus === 'pending' ? (
-                      <span className="text-xs text-amber-400 font-bold italic">⌛ Pending Approval</span>
-                    ) : ws.visibility === 'public' ? (
-                      <button
-                        onClick={() => handleJoinWorkspace(ws._id)}
-                        className="w-full btn-primary"
-                      >
-                        Join Workspace
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleRequestAccess(ws._id)}
-                        className="w-full btn-primary"
-                      >
-                        Request Access
-                      </button>
-                    )}
+
+                  <div className="mt-5 pt-3 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-500">
+                    <div className="flex -space-x-1.5 overflow-hidden">
+                      {board.members?.slice(0, 3).map((member, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-slate-800 to-slate-700 text-white text-[9px] font-bold border border-slate-950"
+                          title={member.name}
+                        >
+                          {member.name?.charAt(0).toUpperCase()}
+                        </span>
+                      ))}
+                      {board.members?.length > 3 && (
+                        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-slate-400 text-[8px] font-semibold border border-slate-950">
+                          +{board.members.length - 3}
+                        </span>
+                      )}
+                    </div>
+                    <span>{board.members?.length || 0} participants</span>
                   </div>
-                </div>
+                </motion.div>
               ))}
+
+              <motion.div
+                whileHover={{ y: -4, scale: 1.01 }}
+                onClick={() => setIsCreateModalOpen(true)}
+                className="flex flex-col items-center justify-center rounded-[24px] border border-dashed border-white/10 bg-transparent p-6 hover:border-sky-500/40 hover:bg-sky-500/5 cursor-pointer text-slate-400 hover:text-sky-450 transition duration-200 min-h-[160px]"
+              >
+                <HiOutlinePlus className="h-6 w-6 mb-2 text-slate-450 group-hover:text-sky-400 transition" />
+                <span className="text-xs font-semibold text-slate-350">Add New Workspace</span>
+                <span className="text-[10px] text-slate-500 mt-1">Start tracking boards</span>
+              </motion.div>
             </div>
-          )}
-        </section>
+          </section>
+
+          {/* Discovery List */}
+          <section className="space-y-4 pt-4 border-t border-white/5">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-450">Discover Workspaces</h2>
+                <p className="text-[10.5px] text-slate-500">Search and join other public or private workspaces on WorkSync.</p>
+              </div>
+              
+              <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                <input
+                  value={discoveryQuery}
+                  onChange={(e) => setDiscoveryQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      searchGlobalWorkspaces(discoveryQuery, discoveryFilter)
+                    }
+                  }}
+                  placeholder="Search workspaces..."
+                  className="rounded-xl border border-white/10 bg-slate-900 px-3.5 py-2 text-xs text-white outline-none focus:border-blue-500 transition w-full sm:w-48"
+                />
+                <select
+                  value={discoveryFilter}
+                  onChange={(e) => setDiscoveryFilter(e.target.value)}
+                  className="rounded-xl border border-white/10 bg-slate-900 px-3.5 py-2 text-xs text-white outline-none focus:border-blue-500 transition cursor-pointer"
+                >
+                  <option value="">All visibility</option>
+                  <option value="public">Public</option>
+                  <option value="private">Private</option>
+                </select>
+                <button
+                  onClick={() => searchGlobalWorkspaces(discoveryQuery, discoveryFilter)}
+                  className="btn-primary text-xs"
+                >
+                  Search
+                </button>
+              </div>
+            </div>
+
+            {isSearchingWorkspaces ? (
+              <div className="text-center py-10 text-xs text-slate-500">Searching workspaces...</div>
+            ) : discoveryResults.length === 0 ? (
+              <div className="text-center py-10 text-xs text-slate-500 italic bg-slate-900/10 border border-dashed border-white/5 rounded-2xl">
+                No public workspaces found.
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {discoveryResults.map((ws) => (
+                  <div key={ws._id} className="premium-card flex flex-col justify-between p-4 bg-slate-900/30">
+                    <div>
+                      <div className="flex items-center justify-between text-[10px] text-slate-500 mb-3">
+                        <span className="bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded font-bold uppercase">{ws.visibility}</span>
+                        <span>{ws.membersCount || 0} members</span>
+                      </div>
+                      <h3 className="text-sm font-semibold text-white truncate">{ws.title}</h3>
+                      <p className="mt-1 text-[11px] text-slate-400 line-clamp-2 min-h-[32px]">{ws.description}</p>
+                      <p className="text-[10px] text-sky-400 mt-2 font-semibold">Owner: {ws.createdBy?.name || 'Owner'}</p>
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-white/5">
+                      {ws.joinStatus === 'member' ? (
+                        <span className="text-xs text-emerald-400 font-bold">✓ Joined</span>
+                      ) : ws.joinStatus === 'pending' ? (
+                        <span className="text-xs text-amber-400 font-bold italic">⌛ Pending Approval</span>
+                      ) : ws.visibility === 'public' ? (
+                        <button
+                          onClick={() => handleJoinWorkspace(ws._id)}
+                          className="w-full btn-primary text-xs"
+                        >
+                          Join Workspace
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleRequestAccess(ws._id)}
+                          className="w-full btn-primary text-xs"
+                        >
+                          Request Access
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
 
         {/* Create Board Modal */}
         {isCreateModalOpen && (
           <div className="premium-modal-backdrop">
-            <div className="premium-modal-container relative">
+            <div className="premium-modal-container relative animate-shimmer">
               <h3 className="text-base font-semibold text-white mb-2">Create New Workspace</h3>
               <p className="text-[11px] text-slate-400 mb-4">Set up board details.</p>
               
@@ -761,7 +927,7 @@ const BoardsScreen = () => {
             </div>
           </div>
         )}
-      </div>
+      </motion.div>
     );
   }
 
@@ -804,38 +970,14 @@ const BoardsScreen = () => {
 
       {/* Tabs Content */}
       <div className="flex-1 min-h-0 overflow-hidden relative">
-        
-        {/* Tab 1: Dashboard */}
+              {/* Tab 1: Dashboard */}
         {activeTab === 'dashboard' && (
-          <div className="h-full flex gap-4 overflow-hidden">
-            {/* Kanban Board */}
-            <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+          <div className="h-full min-h-0 flex overflow-hidden gap-4">
+            <div className="flex-1 min-w-0">
               <Board boardId={boardId} />
             </div>
-
-            {/* Embedded Workspace Activity Panel */}
-            <div className="w-80 flex-shrink-0 bg-slate-900/30 border border-white/10 rounded-2xl p-4 flex flex-col min-h-0">
-              <div className="flex items-center gap-2 text-slate-400 mb-3 border-b border-white/5 pb-2">
-                <HiOutlineClock className="h-4.5 w-4.5 text-sky-400" />
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Workspace Activity</span>
-              </div>
-              <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 custom-scrollbar">
-                {activities.length > 0 ? (
-                  activities.map((act) => (
-                    <div key={act._id} className="p-3 bg-slate-950/40 border border-white/5 rounded-xl text-xs space-y-1">
-                      <div className="flex justify-between items-center text-[9px] text-slate-500 font-semibold">
-                        <span className="text-slate-400">{act.userName}</span>
-                        <span>{new Date(act.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                      </div>
-                      <p className="text-slate-300 leading-normal">{act.message}</p>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-20 text-xs text-slate-500 italic">
-                    No recent activities recorded.
-                  </div>
-                )}
-              </div>
+            <div className="w-80 border-l border-white/10 flex-shrink-0 hidden lg:block">
+              <ActivityPanel activities={activities} onlineUsers={onlineUsers} />
             </div>
           </div>
         )}
@@ -921,9 +1063,11 @@ const BoardsScreen = () => {
                 <span className="text-[10px] uppercase font-bold text-sky-400 block tracking-widest">OWNER</span>
                 {workspaceOwner ? (
                   <div className="p-3 bg-slate-900/40 border border-white/5 rounded-2xl flex items-center gap-3">
-                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 text-white font-bold text-sm">
-                      {workspaceOwner.name ? workspaceOwner.name.charAt(0).toUpperCase() : 'O'}
-                    </span>
+                    <img
+                      src={workspaceOwner.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(workspaceOwner.name || '')}`}
+                      alt={workspaceOwner.name}
+                      className="h-9 w-9 rounded-full object-cover border border-white/10"
+                    />
                     <div>
                       <p className="font-bold text-white text-xs">{workspaceOwner.name || 'Workspace Owner'}</p>
                       <p className="text-[10px] text-slate-500 mt-0.5">{workspaceOwner.email}</p>
@@ -942,9 +1086,11 @@ const BoardsScreen = () => {
                     deDuplicatedMembers.map((member) => (
                       <div key={member._id} className="p-3 bg-slate-900/30 border border-white/5 rounded-2xl flex justify-between items-center gap-3">
                         <div className="flex items-center gap-3">
-                          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-slate-300 font-semibold text-xs">
-                            {member.name ? member.name.charAt(0).toUpperCase() : 'M'}
-                          </span>
+                          <img
+                            src={member.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(member.name || '')}`}
+                            alt={member.name}
+                            className="h-8 w-8 rounded-full object-cover border border-white/10"
+                          />
                           <div>
                             <p className="font-semibold text-white text-xs">{member.name}</p>
                             <p className="text-[10px] text-slate-500 mt-0.5">{member.email}</p>
@@ -1253,6 +1399,14 @@ const BoardsScreen = () => {
         isOpen={Boolean(taskId)}
         onClose={() => navigate(`/boards/${boardId}`)}
       />
+
+      {commentsTaskId && (
+        <CommentsModal
+          taskId={commentsTaskId}
+          boardId={boardId}
+          onClose={() => navigate(`/boards/${boardId}`)}
+        />
+      )}
     </div>
   )
 }

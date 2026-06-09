@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { 
   HiOutlineSparkles, 
   HiOutlineUser, 
@@ -22,14 +23,13 @@ const AdminSidebar = () => {
     { path: '/admin/workspaces', label: 'Workspaces', icon: HiOutlineFolder },
     { path: '/admin/analytics', label: 'Analytics', icon: HiOutlineChartBar },
     { path: '/admin/security', label: 'Security Center', icon: HiOutlineLockClosed },
-    { path: '/admin/role-management', label: 'Role Management', icon: HiOutlineShieldCheck },
     { path: '/admin/system-health', label: 'System Health', icon: HiOutlineStatusOnline },
     { path: '/admin/access-control', label: 'Access Control', icon: HiOutlineShieldCheck },
     { path: '/admin/settings', label: 'Settings', icon: HiOutlineCog },
   ];
 
   return (
-    <aside className="w-72 bg-slate-950 border-r border-white/10 p-4 flex flex-col justify-between flex-shrink-0">
+    <aside className="w-72 bg-slate-950/45 backdrop-blur-xl border-r border-white/6 p-4 flex flex-col justify-between flex-shrink-0">
       <div className="space-y-6">
         <div className="space-y-2">
           <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-500">Console Directory</p>
@@ -42,15 +42,26 @@ const AdminSidebar = () => {
                   to={item.path}
                   end={item.end}
                   className={({ isActive }) => 
-                    `w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold transition text-left border ${
+                    `relative w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold transition text-left border border-transparent ${
                       isActive 
-                        ? 'bg-blue-600/10 text-blue-500 border-blue-500/20' 
-                        : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900 border-transparent'
+                        ? 'text-sky-400' 
+                        : 'text-slate-400 hover:text-slate-100 hover:bg-white/5'
                     }`
                   }
                 >
-                  <Icon className="h-4.5 w-4.5" />
-                  <span>{item.label}</span>
+                  {({ isActive }) => (
+                    <>
+                      {isActive && (
+                        <motion.span
+                          layoutId="activeAdminNav"
+                          className="absolute inset-0 bg-[rgba(57,189,248,0.12)] border border-[rgba(57,189,248,0.25)] rounded-xl z-0"
+                          transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                        />
+                      )}
+                      <Icon className="h-4.5 w-4.5 relative z-10" />
+                      <span className="relative z-10">{item.label}</span>
+                    </>
+                  )}
                 </NavLink>
               );
             })}

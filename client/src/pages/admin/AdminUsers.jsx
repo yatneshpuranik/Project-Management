@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { pageVariants } from '../../../utils/motion.js';
 import { HiOutlineSearch } from 'react-icons/hi';
 import axiosInstance from '../../../utils/axiosInstance';
 import { toast } from '../../../utils/toast';
@@ -123,10 +125,16 @@ const AdminUsers = () => {
     }
   };
 
-  const filteredUsersList = users.filter((u) =>
-    u.name?.toLowerCase().includes(userQuery.toLowerCase()) ||
-    u.email?.toLowerCase().includes(userQuery.toLowerCase())
-  );
+  const filter = searchParams.get('filter') || '';
+  const filteredUsersList = users.filter((u) => {
+    const matchesQuery = (u.name?.toLowerCase().includes(userQuery.toLowerCase()) ||
+      u.email?.toLowerCase().includes(userQuery.toLowerCase())) &&
+      u.role !== 'ADMIN';
+    if (filter === 'restricted') {
+      return matchesQuery && u.isBlocked;
+    }
+    return matchesQuery;
+  });
 
   if (loading) {
     return (
@@ -138,7 +146,13 @@ const AdminUsers = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <motion.div
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="space-y-6"
+    >
       <div className="flex items-center justify-between border-b border-white/10 pb-4">
         <div>
           <h2 className="text-xl font-bold text-white">Users Moderation</h2>
@@ -161,6 +175,7 @@ const AdminUsers = () => {
             users={filteredUsersList}
             selectedUser={selectedUser}
             onSelectUser={handleSelectUser}
+            filter={filter}
           />
         </div>
 
@@ -176,7 +191,7 @@ const AdminUsers = () => {
           />
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

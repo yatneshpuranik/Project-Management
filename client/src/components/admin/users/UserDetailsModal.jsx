@@ -42,9 +42,11 @@ const UserDetailsModal = ({
   return (
     <div className="space-y-4 text-xs">
       <div className="flex items-center gap-3.5 border-b border-white/5 pb-3">
-        <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white text-lg font-bold flex-shrink-0">
-          {selectedUser.name?.charAt(0).toUpperCase()}
-        </span>
+        <img
+          src={selectedUser.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(selectedUser.name || '')}`}
+          alt={selectedUser.name}
+          className="h-12 w-12 rounded-full object-cover border border-white/10 flex-shrink-0"
+        />
         <div className="min-w-0 flex-1">
           <h3 className="font-bold text-white text-sm truncate">{selectedUser.name}</h3>
           <p className="text-[10px] text-slate-500 truncate mt-0.5">{selectedUser.email}</p>

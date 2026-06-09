@@ -2,6 +2,7 @@ import { NavLink, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { HiOutlineHome, HiOutlineViewBoards, HiOutlineChartBar, HiOutlineClock, HiOutlineUser, HiOutlineCog, HiOutlineShieldCheck } from 'react-icons/hi'
 import { toast } from '../utils/toast'
+import { motion } from 'framer-motion'
 
 const navItems = [
   { label: 'Dashboard', to: '/boards', icon: HiOutlineHome, end: true },
@@ -19,6 +20,7 @@ const Sidebar = ({ onLinkClick }) => {
 
   const userRole = localStorage.getItem('userRole')
   const userEmail = localStorage.getItem('userEmail')
+  const currentUserId = localStorage.getItem('userId')
   const isAdmin = userRole === 'ADMIN'
 
   // If Admin, only show the Admin Panel link. Remove normal workspace routes.
@@ -35,12 +37,15 @@ const Sidebar = ({ onLinkClick }) => {
     if (onLinkClick) onLinkClick()
   }
 
+  const myWorkspaces = boards.filter(b => (b.createdBy?._id || b.createdBy || '').toString() === currentUserId)
+  const joinedWorkspaces = boards.filter(b => (b.createdBy?._id || b.createdBy || '').toString() !== currentUserId)
+
   return (
     <div className="flex h-full flex-col justify-between">
       <div className="space-y-6 overflow-y-auto pr-1">
         {/* Navigation Section */}
         <div className="space-y-2">
-          <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-500">Navigation</p>
+          <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">Navigation</p>
           <nav className="space-y-1">
             {items.map((item) => {
               const Icon = item.icon
@@ -72,15 +77,22 @@ const Sidebar = ({ onLinkClick }) => {
                   to={item.to}
                   onClick={handleClick}
                   className={
-                    `flex items-center gap-3 rounded-xl px-3.5 py-3 text-xs font-semibold transition ${
+                    `relative flex items-center gap-3 rounded-xl px-3.5 py-3 text-xs font-semibold transition border border-transparent ${
                       isCustomActive 
-                        ? 'bg-blue-600/10 text-blue-500 border border-blue-500/20' 
-                        : 'text-slate-400 hover:bg-slate-900 hover:text-slate-100 border border-transparent'
+                        ? 'text-sky-400' 
+                        : 'text-slate-400 hover:text-slate-100 hover:bg-white/5'
                     }`
                   }
                 >
-                  <Icon className="h-4.5 w-4.5" />
-                  {item.label}
+                  {isCustomActive && (
+                    <motion.span
+                      layoutId="activeUserNav"
+                      className="absolute inset-0 bg-[rgba(57,189,248,0.12)] border border-[rgba(57,189,248,0.25)] rounded-xl z-0"
+                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                    />
+                  )}
+                  <Icon className="h-4.5 w-4.5 relative z-10" />
+                  <span className="relative z-10">{item.label}</span>
                 </NavLink>
               )
             })}
@@ -89,35 +101,85 @@ const Sidebar = ({ onLinkClick }) => {
 
         {/* Boards Section - Only show to non-admins */}
         {!isAdmin && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between px-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-500">My Workspaces</p>
-              <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-slate-400 border border-white/5">{boards.length}</span>
+          <div className="space-y-4">
+            {/* MY WORKSPACES */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between px-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">MY WORKSPACES</p>
+                <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-slate-400 border border-white/5">{myWorkspaces.length}</span>
+              </div>
+              <div className="space-y-1.5 max-h-[30vh] overflow-y-auto custom-scrollbar">
+                {myWorkspaces.length > 0 ? (
+                  myWorkspaces.map((board) => (
+                    <button
+                      key={board._id}
+                      type="button"
+                      onClick={() => handleSelectBoard(board._id)}
+                      className={`relative w-full flex flex-col items-start gap-1 rounded-xl px-3.5 py-3 text-left text-xs transition border border-transparent ${
+                        activeBoardId === board._id
+                          ? 'text-white'
+                          : 'text-slate-400 hover:text-slate-100 hover:bg-white/5'
+                      }`}
+                    >
+                      {activeBoardId === board._id && (
+                        <motion.span
+                          layoutId="activeWorkspaceNav"
+                          className="absolute inset-0 bg-[rgba(57,189,248,0.12)] border border-[rgba(57,189,248,0.25)] rounded-xl z-0"
+                          transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                        />
+                      )}
+                      <span className="font-semibold truncate w-full relative z-10">{board.title}</span>
+                      {board.description && (
+                        <span className="text-[10px] text-slate-500 line-clamp-1 relative z-10">{board.description}</span>
+                      )}
+                    </button>
+                  ))
+                ) : (
+                  <div className="rounded-xl border border-dashed border-white/5 bg-slate-900/30 px-3 py-4 text-center text-[11px] text-slate-500">
+                    No owned workspaces.
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="space-y-1.5 max-h-[30vh] overflow-y-auto custom-scrollbar">
-              {boards.length > 0 ? (
-                boards.map((board) => (
-                  <button
-                    key={board._id}
-                    type="button"
-                    onClick={() => handleSelectBoard(board._id)}
-                    className={`w-full flex flex-col items-start gap-1 rounded-xl px-3.5 py-3 text-left text-xs transition border ${
-                      activeBoardId === board._id
-                        ? 'border-blue-500/20 bg-blue-600/10 text-white shadow-sm'
-                        : 'border-transparent text-slate-400 hover:bg-slate-900 hover:text-slate-100'
-                    }`}
-                  >
-                    <span className="font-semibold truncate w-full">{board.title}</span>
-                    {board.description && (
-                      <span className="text-[10px] text-slate-500 line-clamp-1">{board.description}</span>
-                    )}
-                  </button>
-                ))
-              ) : (
-                <div className="rounded-xl border border-dashed border-white/5 bg-slate-900/30 px-3 py-4 text-center text-[11px] text-slate-500">
-                  No active boards.
-                </div>
-              )}
+
+            {/* JOINED WORKSPACES */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between px-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">JOINED WORKSPACES</p>
+                <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-slate-400 border border-white/5">{joinedWorkspaces.length}</span>
+              </div>
+              <div className="space-y-1.5 max-h-[30vh] overflow-y-auto custom-scrollbar">
+                {joinedWorkspaces.length > 0 ? (
+                  joinedWorkspaces.map((board) => (
+                    <button
+                      key={board._id}
+                      type="button"
+                      onClick={() => handleSelectBoard(board._id)}
+                      className={`relative w-full flex flex-col items-start gap-1 rounded-xl px-3.5 py-3 text-left text-xs transition border border-transparent ${
+                        activeBoardId === board._id
+                          ? 'text-white'
+                          : 'text-slate-400 hover:text-slate-100 hover:bg-white/5'
+                      }`}
+                    >
+                      {activeBoardId === board._id && (
+                        <motion.span
+                          layoutId="activeWorkspaceNav"
+                          className="absolute inset-0 bg-[rgba(57,189,248,0.12)] border border-[rgba(57,189,248,0.25)] rounded-xl z-0"
+                          transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                        />
+                      )}
+                      <span className="font-semibold truncate w-full relative z-10">{board.title}</span>
+                      {board.description && (
+                        <span className="text-[10px] text-slate-500 line-clamp-1 relative z-10">{board.description}</span>
+                      )}
+                    </button>
+                  ))
+                ) : (
+                  <div className="rounded-xl border border-dashed border-white/5 bg-slate-900/30 px-3 py-4 text-center text-[11px] text-slate-500">
+                    No joined workspaces.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -126,8 +188,8 @@ const Sidebar = ({ onLinkClick }) => {
       {/* Sidebar Footer */}
       {!isAdmin && (
         <div className="mt-auto pt-4 border-t border-white/5">
-          <div className="rounded-xl bg-slate-900/40 p-3 border border-white/5 text-[11px] text-slate-400 leading-normal">
-            <p className="font-semibold text-slate-200">Collab Workspace</p>
+          <div className="rounded-2xl bg-slate-900/30 p-3 border border-white/5 text-[11px] text-slate-400 leading-normal backdrop-blur-md">
+            <p className="font-semibold text-slate-200 uppercase tracking-[0.2em] text-[9px]">COLLAB WORKSPACE</p>
             <p className="mt-1">Build cards, track reviews, and run sprints dynamically.</p>
           </div>
         </div>

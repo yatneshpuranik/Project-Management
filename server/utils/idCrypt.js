@@ -156,15 +156,13 @@ export const encryptUserIds = (data) => {
         let val = data[key];
 
         // Perform encryption on keys and values
-        if (key === '_id' || key === 'id') {
+        if (key === '_id' || key === 'id' || key.endsWith('Id')) {
           if (val) {
-            clone[key] = encryptId(val.toString());
-          } else {
-            clone[key] = val;
-          }
-        } else if (key.endsWith('Id')) {
-          if (val) {
-            clone[key] = encryptId(val.toString());
+            if (typeof val === 'object' && !(val instanceof mongoose.Types.ObjectId) && val.constructor?.name !== 'ObjectId') {
+              clone[key] = encryptUserIds(val);
+            } else {
+              clone[key] = encryptId(val.toString());
+            }
           } else {
             clone[key] = val;
           }

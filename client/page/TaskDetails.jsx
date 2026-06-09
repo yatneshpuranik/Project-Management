@@ -322,27 +322,6 @@ const TaskDetails = () => {
             </div>
           </section>
 
-          <section className="rounded-3xl border border-white/10 bg-slate-900/60 p-6 shadow-lg shadow-slate-950/20">
-            <div className="flex items-center gap-3 text-sm text-slate-400">
-              <HiOutlineClipboardList className="h-5 w-5 text-sky-400" />
-              <h2 className="font-semibold text-white">Activity timeline</h2>
-            </div>
-            <div className="mt-6 space-y-4">
-              {activity.length === 0 ? (
-                <div className="rounded-3xl bg-slate-950/50 p-4 text-sm text-slate-500">No activity available yet.</div>
-              ) : (
-                activity.map((item) => (
-                  <div key={item._id} className="rounded-3xl border border-white/10 bg-slate-950/50 p-4">
-                    <p className="text-sm text-slate-200">{item.message}</p>
-                    <div className="mt-3 flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-slate-500">
-                      <span>{item.type}</span>
-                      <span>{new Date(item.createdAt).toLocaleString()}</span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
         </div>
 
         <div className="space-y-6">

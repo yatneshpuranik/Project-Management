@@ -6,6 +6,7 @@ const router = express.Router();
 
 router.post("/register", createUser);
 router.post("/login", loginUser);
+router.post("/logout", LogoutUser);
 
 router.use(authenticateToken);
 router.get("/me", getCurrentUser);
@@ -18,5 +19,4 @@ router.post("/promote/:userId", promoteUser);
 router.post("/demote/:userId", demoteUser);
 router.post("/presence", updatePresence);
 router.get("/:id", getUserByID);
-router.post("/logout", LogoutUser);
 export default router

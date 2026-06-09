@@ -1,7 +1,7 @@
 import { HiOutlineClock, HiOutlineSparkles } from 'react-icons/hi'
 
-const ActivityPanel = ({ tasks = [], onlineUsers = [] }) => {
-  const recentActions = tasks.slice(0, 6)
+const ActivityPanel = ({ activities = [], onlineUsers = [] }) => {
+  const recentActions = activities.slice(0, 15)
 
   return (
     <div className="flex h-full flex-col bg-slate-950">
@@ -26,22 +26,24 @@ const ActivityPanel = ({ tasks = [], onlineUsers = [] }) => {
 
           <div className="space-y-2">
             {recentActions.length > 0 ? (
-              recentActions.map((task) => (
-                <div key={task._id} className="rounded-xl border border-white/5 bg-slate-900/20 p-3 text-xs leading-normal">
+              recentActions.map((activity) => (
+                <div key={activity._id} className="rounded-xl border border-white/5 bg-slate-900/20 p-3 text-xs leading-normal">
                   <div className="flex items-center justify-between gap-2 text-[10px] text-slate-500 mb-1">
-                    <span className="font-semibold truncate">{task.assignedTo?.name || 'Workspace Member'}</span>
-                    <span className="rounded-full bg-slate-900 border border-white/5 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-slate-400">
-                      {task.status}
-                    </span>
+                    <span className="font-semibold truncate">{activity.userName || 'Workspace Member'}</span>
+                    {activity.type && (
+                      <span className="rounded-full bg-slate-900 border border-white/5 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-slate-400">
+                        {activity.type}
+                      </span>
+                    )}
                   </div>
-                  <p className="font-semibold text-slate-200 truncate">{task.title}</p>
-                  {task.description && (
-                    <p className="text-[10px] text-slate-500 mt-1 line-clamp-1">{task.description}</p>
-                  )}
+                  <p className="text-slate-200">{activity.message}</p>
+                  <span className="text-[9px] text-slate-550 block mt-1">
+                    {new Date(activity.createdAt).toLocaleString()}
+                  </span>
                 </div>
               ))
             ) : (
-              <p className="text-[10px] text-slate-500 text-center py-4 border border-dashed border-white/5 rounded-xl">
+              <p className="text-[10px] text-slate-505 text-center py-4 border border-dashed border-white/5 rounded-xl">
                 No recent activity.
               </p>
             )}

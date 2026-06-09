@@ -35,7 +35,7 @@ export const createUser = async (req, res) => {
                 message: "Username is already taken"
             });
         }
-
+        console.log("password => ", password);
         let hashedPassword = await bycrypt.hash(password, 10);
         user = await User.create({
             name,
@@ -45,12 +45,12 @@ export const createUser = async (req, res) => {
 
         // Log User Created Audit
         await AuditLog.create({
-          action: 'User Created',
-          actorId: user._id,
-          actorName: user.name,
-          details: `User registered with email: ${user.email}`,
-          ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || ''
-        }).catch(e => {});
+            action: 'User Created',
+            actorId: user._id,
+            actorName: user.name,
+            details: `User registered with email: ${user.email}`,
+            ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || ''
+        }).catch(e => { });
 
         const token = genToken(user._id);
         const safeUser = user.toObject();
@@ -91,19 +91,25 @@ export const loginUser = async (req, res) => {
         }
 
         const normalizedEmail = email.toLowerCase().trim();
+        const escapedEmail = email.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const caseInsensitiveRegex = new RegExp(`^${escapedEmail}$`, 'i');
         const user = await User.findOne({
-            $or: [{ email: normalizedEmail }, { name: email }, { username: email }]
+            $or: [
+                { email: normalizedEmail },
+                { name: { $regex: caseInsensitiveRegex } },
+                { username: { $regex: caseInsensitiveRegex } }
+            ]
         });
 
         if (!user) {
             // Log failed login
             await AuditLog.create({
-              action: 'Failed Login',
-              actorId: new mongoose.Types.ObjectId("000000000000000000000000"),
-              actorName: email,
-              details: `Login attempt failed: user not found`,
-              ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || ''
-            }).catch(e => {});
+                action: 'Failed Login',
+                actorId: new mongoose.Types.ObjectId("000000000000000000000000"),
+                actorName: email,
+                details: `Login attempt failed: user not found`,
+                ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || ''
+            }).catch(e => { });
 
             return res.status(401).json({
                 success: false,
@@ -122,12 +128,12 @@ export const loginUser = async (req, res) => {
         if (!isMatch) {
             // Log failed login
             await AuditLog.create({
-              action: 'Failed Login',
-              actorId: user._id,
-              actorName: user.name,
-              details: `Login attempt failed: invalid password`,
-              ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || ''
-            }).catch(e => {});
+                action: 'Failed Login',
+                actorId: user._id,
+                actorName: user.name,
+                details: `Login attempt failed: invalid password`,
+                ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || ''
+            }).catch(e => { });
 
             return res.status(401).json({
                 success: false,
@@ -432,7 +438,7 @@ export const searchUsers = async (req, res) => {
 
         const searchQuery = q.trim();
         const Notification = (await import('../model/notification.js')).default;
-        
+
         let board = null;
         let excludeIds = [req.userId];
         let decBoardId = boardId;
@@ -474,8 +480,8 @@ export const searchUsers = async (req, res) => {
         }
 
         const users = await User.find(queryCond)
-        .select('name email role avatar')
-        .limit(10);
+            .select('name email role avatar')
+            .limit(10);
 
         const safeUsers = users.map(user => {
             const u = user.toObject();
@@ -692,4 +698,4 @@ export const updateProfile = async (req, res) => {
     } catch (err) {
         return res.status(500).json({ success: false, message: err.message });
     }
-};
+};

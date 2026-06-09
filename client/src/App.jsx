@@ -26,7 +26,49 @@ import AdminAnalytics from './pages/admin/AdminAnalytics.jsx'
 import AdminSecurity from './pages/admin/AdminSecurity.jsx'
 import AdminSettings from './pages/admin/AdminSettings.jsx'
 import AdminAccessControl from './pages/admin/AdminAccessControl.jsx'
+import AdminTasks from './pages/admin/AdminTasks.jsx'
 
+import Sidebar from '../components/Sidebar.jsx'
+import AdminSidebar from './components/admin/layout/AdminSidebar.jsx'
+import AdminNavbar from './components/admin/layout/AdminNavbar.jsx'
+import Footer from '../components/Footer.jsx'
+
+const ProfileScreenWrapper = ({ isSidebarOpen, closeSidebar }) => {
+  const { user } = useSelector((state) => state.user)
+  if (user?.role === 'ADMIN') {
+    return (
+      <div className="h-screen bg-slate-950 text-slate-100 flex flex-col overflow-hidden">
+        <AdminNavbar />
+        <div className="flex-1 flex overflow-hidden">
+          <AdminSidebar />
+          <main className="flex-1 bg-slate-950/40 p-4 md:p-6 lg:p-8 overflow-y-auto custom-scrollbar">
+            <ProfileScreen />
+          </main>
+        </div>
+      </div>
+    )
+  } else {
+    return (
+      <div className="flex flex-1 w-full overflow-hidden relative">
+        {isSidebarOpen && (
+          <div 
+            onClick={closeSidebar}
+            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden transition-opacity duration-300"
+          />
+        )}
+        <aside className="fixed top-[73px] bottom-0 left-0 z-40 w-72 border-r border-white/6 bg-slate-950/45 backdrop-blur-xl p-4 transition-transform duration-300 ease-in-out md:static md:translate-x-0 md:w-64 lg:w-72 flex-shrink-0 flex flex-col h-[calc(100vh-73px)]">
+          <Sidebar onLinkClick={closeSidebar} />
+        </aside>
+        <main className="flex flex-1 flex-col overflow-y-auto overflow-x-hidden bg-slate-950/40 h-[calc(100vh-73px)]">
+          <div className="flex-1 w-full p-4 md:p-6 lg:p-8">
+            <ProfileScreen />
+          </div>
+          <Footer />
+        </main>
+      </div>
+    )
+  }
+}
 
 const App = () => {
   const dispatch = useDispatch()
@@ -99,7 +141,7 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col overflow-hidden">
-      {!isAdminPath && <Navbar toggleSidebar={toggleSidebar} />}
+      {!isAdminPath && location.pathname !== '/profile' && <Navbar toggleSidebar={toggleSidebar} />}
       {authChecked ? (
         <Routes>
           <Route path='/' element={<Home />} />
@@ -116,11 +158,20 @@ const App = () => {
             <Route path='/boards' element={<BoardsScreen />} />
             <Route path='/boards/:boardId/tasks/:taskId' element={<BoardsScreen />} />
             <Route path='/boards/:boardId' element={<BoardsScreen />} />
-            <Route path='/profile' element={<ProfileScreen />} />
             <Route path='/all-users' element={<AllUser />} />
             <Route path='/analytics' element={<AnalyticsScreen />} />
             <Route path='/settings' element={<SettingsScreen />} />
           </Route>
+
+          {/* Shared Profile Page Route */}
+          <Route
+            path='/profile'
+            element={
+              <ProtectedRoute allowedRoles={['USER', 'ADMIN']}>
+                <ProfileScreenWrapper isSidebarOpen={isSidebarOpen} closeSidebar={closeSidebar} />
+              </ProtectedRoute>
+            }
+          />
  
           {/* Admin Protected Area */}
           <Route
@@ -133,6 +184,7 @@ const App = () => {
             <Route path='/admin' element={<AdminDashboard />} />
             <Route path='/admin/users' element={<AdminUsers />} />
             <Route path='/admin/workspaces' element={<AdminWorkspaces />} />
+            <Route path='/admin/tasks' element={<AdminTasks />} />
             <Route path='/admin/analytics' element={<AdminAnalytics />} />
             <Route path='/admin/security' element={<AdminSecurity view="security" />} />
             <Route path='/admin/role-management' element={<AdminSecurity view="roles" />} />

@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import { pageVariants } from '../../../utils/motion.js';
 import axiosInstance from '../../../utils/axiosInstance';
 import { toast } from '../../../utils/toast.js';
 import { HiOutlineShieldCheck, HiOutlineCheck } from 'react-icons/hi';
@@ -58,12 +60,10 @@ const AdminAccessControl = () => {
     { key: 'canDeleteWorkspace', label: 'Delete Workspace' },
     { key: 'canArchiveWorkspace', label: 'Archive Workspace' },
     { key: 'canAssignTasks', label: 'Assign Tasks' },
-    { key: 'canMoveTasks', label: 'Move Tasks' },
-    { key: 'canModerateComments', label: 'Moderate Comments' },
-    { key: 'canManagePermissions', label: 'Manage Permissions' },
+    { key: 'canModerateComments', label: 'Moderate Content' },
   ];
 
-  const rolesList = ['ADMIN', 'WORKSPACE_OWNER', 'WORKSPACE_MEMBER', 'USER'];
+  const rolesList = ['WORKSPACE_OWNER', 'WORKSPACE_MEMBER'];
 
   if (loading) {
     return (
@@ -75,74 +75,96 @@ const AdminAccessControl = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <motion.div
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="space-y-8"
+    >
+      {/* Section 1: Access Control Title & Header */}
       <div className="flex flex-col gap-1 border-b border-white/10 pb-4">
         <h2 className="text-xl font-bold text-white flex items-center gap-2">
-          <HiOutlineShieldCheck className="h-6 w-6 text-blue-500" /> Platform Access Control Matrix
+          <HiOutlineShieldCheck className="h-6 w-6 text-blue-500" /> Access Control
         </h2>
-        <p className="text-xs text-slate-400">
-          Configure dynamic action authorization rules across all platform roles. Admins can inspect and modify matrix settings.
+        <h3 className="text-sm font-semibold text-slate-300">Roles & Permission Configuration</h3>
+        <p className="text-xs text-slate-450 leading-relaxed">
+          Manage workspace role capabilities and review platform role hierarchy.
         </p>
       </div>
 
-      <div className="premium-card p-0 overflow-hidden shadow-2xl">
-        <div className="overflow-x-auto custom-scrollbar">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-950/80 border-b border-white/10 text-slate-400 uppercase tracking-wider font-bold">
-                <th className="p-4 min-w-[150px]">System Role</th>
-                {permissionKeys.map((p) => (
-                  <th key={p.key} className="p-4 text-center min-w-[140px]" title={p.label}>
-                    {p.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5 bg-slate-950/20">
-              {rolesList.map((role) => {
-                const rolePerm = permissions.find((p) => p.role === role) || {};
-                const isPrimaryAdmin = role === 'ADMIN';
+      {/* Section 2: Role Description */}
+      <div className="bg-slate-900/30 border border-white/5 rounded-2xl p-5 space-y-4">
+        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Role Description</h3>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="bg-slate-950/40 p-4 rounded-xl border border-white/5 space-y-1">
+            <h4 className="text-xs font-bold text-sky-400 uppercase tracking-wider">ADMIN</h4>
+            <p className="text-[11px] text-slate-300 font-semibold">Platform administrator.</p>
+            <p className="text-[10px] text-slate-500 leading-normal font-semibold">
+              Can manage users, workspaces, permissions and moderation.
+            </p>
+          </div>
+          <div className="bg-slate-950/40 p-4 rounded-xl border border-white/5 space-y-1">
+            <h4 className="text-xs font-bold text-violet-450 uppercase tracking-wider">USER</h4>
+            <p className="text-[11px] text-slate-300 font-semibold">Platform user.</p>
+            <p className="text-[10px] text-slate-500 leading-normal font-semibold">
+              Can become Workspace Owner or Workspace Member depending on workspace permissions.
+            </p>
+          </div>
+        </div>
+      </div>
 
-                return (
-                  <tr
-                    key={role}
-                    className="hover:bg-slate-900/35 transition-colors duration-150"
-                  >
-                    <td className="p-4 font-bold text-white">
-                      <div className="flex flex-col">
+      {/* Section 3: Workspace Permission Matrix */}
+      <div className="space-y-4">
+        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Workspace Permission Matrix</h3>
+        <div className="premium-card p-0 overflow-hidden shadow-2xl">
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-950/80 border-b border-white/10 text-slate-400 uppercase tracking-wider font-bold">
+                  <th className="p-4 min-w-[160px]">System Role</th>
+                  {permissionKeys.map((p) => (
+                    <th key={p.key} className="p-4 text-center min-w-[140px]" title={p.label}>
+                      {p.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5 bg-slate-950/20">
+                {rolesList.map((role) => {
+                  const rolePerm = permissions.find((p) => p.role === role) || {};
+
+                  return (
+                    <tr
+                      key={role}
+                      className="hover:bg-slate-900/35 transition-colors duration-150"
+                    >
+                      <td className="p-4 font-bold text-white uppercase tracking-wider">
                         <span>{role.replace('_', ' ')}</span>
-                        {isPrimaryAdmin && (
-                          <span className="text-[9px] text-blue-500 font-bold uppercase mt-0.5">
-                            Default Bypass
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    {permissionKeys.map((p) => {
-                      const hasPerm = !!rolePerm[p.key];
-                      return (
-                        <td key={p.key} className="p-4 text-center">
-                          <label className="inline-flex items-center justify-center cursor-pointer select-none">
-                            <input
-                              type="checkbox"
-                              checked={hasPerm}
-                              disabled={isPrimaryAdmin} // Primary Admin always bypasses all checks, keep read-only checked
-                              onChange={() =>
-                                handleTogglePermission(role, p.key, hasPerm)
-                              }
-                              className={`h-5 w-5 rounded border-white/15 bg-slate-950 text-blue-500 focus:ring-blue-500 focus:ring-offset-slate-950 transition cursor-pointer ${
-                                isPrimaryAdmin ? 'cursor-not-allowed opacity-50' : ''
-                              }`}
-                            />
-                          </label>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      {permissionKeys.map((p) => {
+                        const hasPerm = !!rolePerm[p.key];
+                        return (
+                          <td key={p.key} className="p-4 text-center">
+                            <label className="inline-flex items-center justify-center cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={hasPerm}
+                                onChange={() =>
+                                  handleTogglePermission(role, p.key, hasPerm)
+                                }
+                                className="h-5 w-5 rounded border-white/15 bg-slate-950 text-blue-500 focus:ring-blue-500 focus:ring-offset-slate-950 transition cursor-pointer"
+                              />
+                            </label>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
       
@@ -153,7 +175,7 @@ const AdminAccessControl = () => {
           Workspace Owner permissions dictate maximum actions within their owned boundaries. Workspace Members inherit actions enabled above.
         </p>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

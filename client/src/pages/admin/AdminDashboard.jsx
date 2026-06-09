@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import { pageVariants } from '../../../utils/motion.js';
 import axiosInstance from '../../../utils/axiosInstance';
 import OverviewStats from '../../components/admin/overview/OverviewStats';
 import OverviewCharts from '../../components/admin/overview/OverviewCharts';
@@ -48,7 +50,13 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <motion.div
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="space-y-6"
+    >
       {error && (
         <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-4 rounded-xl text-xs font-bold">
           {error}
@@ -70,7 +78,7 @@ const AdminDashboard = () => {
       {securitySummary && (
         <RecentActivity activities={securitySummary.recentAdminActions || []} />
       )}
-    </div>
+    </motion.div>
   );
 };
 

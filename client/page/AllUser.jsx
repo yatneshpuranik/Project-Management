@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
+import { pageVariants } from '../utils/motion.js'
 import axiosInstance from '../utils/axiosInstance'
 
 const AllUser = () => {
@@ -51,7 +53,13 @@ const AllUser = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 px-4 py-8 sm:px-6 lg:px-8">
+    <motion.div
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="min-h-screen bg-slate-950 text-slate-100 px-4 py-8 sm:px-6 lg:px-8"
+    >
       <div className="mx-auto max-w-7xl space-y-8">
         <header className="rounded-[32px] border border-white/10 bg-slate-900/80 p-8 shadow-2xl shadow-slate-950/40">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -90,9 +98,11 @@ const AllUser = () => {
                       </div>
                       <p className="mt-1 text-sm text-slate-400">{user.email}</p>
                     </div>
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-200">
-                      {user.name?.charAt(0).toUpperCase() || 'U'}
-                    </div>
+                    <img
+                      src={user.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name || '')}`}
+                      alt={user.name}
+                      className="h-12 w-12 rounded-full object-cover border border-white/10"
+                    />
                   </div>
                   
                   <div className="mt-5 space-y-2 text-sm text-slate-400">
@@ -138,7 +148,7 @@ const AllUser = () => {
           )}
         </section>
       </div>
-    </div>
+    </motion.div>
   )
 }
 
