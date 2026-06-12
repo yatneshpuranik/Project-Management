@@ -35,19 +35,33 @@ validateEnv()
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: process.env.FRONTEND_URL,
-    credentials: true,
+
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:5173',
+  'http://127.0.0.1:5173'
+].filter(Boolean);
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    const isLocal = origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:');
+    if (allowedOrigins.indexOf(origin) !== -1 || isLocal) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
   },
+  credentials: true,
+};
+
+const io = new Server(server, {
+  cors: corsOptions,
 });
 
 // Middleware
-app.set('trust proxy', 1)
-app.use(cors({
-  origin: process.env.FRONTEND_URL ,
-  credentials: true,
-}));
+app.set('trust proxy', 1);
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(decryptionMiddleware);
 app.use(cookieParser());

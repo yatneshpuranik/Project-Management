@@ -22,17 +22,22 @@ export const authenticateToken = async (req, res, next) => {
     }
 
     const user = await User.findById(req.userId).select('-password');
-    if (user) {
-      if (user.isBlocked) {
-        try {
-          res.clearCookie && res.clearCookie('token');
-        } catch (e) {}
-        return res.status(403).json({ message: 'Your account has been blocked', isBlocked: true });
-      }
-      req.userName = user.name;
-      req.user = user;
+    if (!user) {
+      try {
+        res.clearCookie && res.clearCookie('token');
+      } catch (e) {}
+      return res.status(401).json({ message: 'Authentication failed: User not found' });
     }
 
+    if (user.isBlocked) {
+      try {
+        res.clearCookie && res.clearCookie('token');
+      } catch (e) {}
+      return res.status(403).json({ message: 'Your account has been blocked', isBlocked: true });
+    }
+
+    req.userName = user.name;
+    req.user = user;
     next();
   } catch (error) {
     // Clear cookie when token invalid/expired to avoid persistent bad cookie

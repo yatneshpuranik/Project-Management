@@ -28,7 +28,7 @@ const AdminDashboard = () => {
       setSecuritySummary(secRes.data);
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.message || 'Failed to initialize administrative panels.');
+      setError(err.response?.data?.message || err.message || 'Failed to initialize administrative panels.');
     } finally {
       setLoading(false);
     }

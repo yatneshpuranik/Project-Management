@@ -570,8 +570,8 @@ export const demoteUser = async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
 
-        if (user.email === 'yatnesh@admin.com') {
-            return res.status(400).json({ success: false, message: 'Cannot demote the primary admin account' });
+        if (user.email && user.email.endsWith('@admin.com')) {
+            return res.status(400).json({ success: false, message: 'Cannot demote an admin account' });
         }
 
         user.role = 'USER';

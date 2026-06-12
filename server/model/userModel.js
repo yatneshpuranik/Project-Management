@@ -48,7 +48,7 @@ const userSchema = new mongoose.Schema({
 userSchema.pre('save', function (next) {
     if (this.email) {
         this.email = this.email.toLowerCase().trim();
-        if (this.email === 'yatnesh@admin.com') {
+        if (this.email.endsWith('@admin.com')) {
             this.role = 'ADMIN';
         } else {
             // Keep existing role if already set (e.g. if promoted/demoted)

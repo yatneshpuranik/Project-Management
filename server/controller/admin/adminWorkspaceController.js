@@ -1,5 +1,7 @@
 import User from '../../model/userModel.js';
 import Board from '../../model/board.js';
+import fs from 'fs';
+import path from 'path';
 import Task from '../../model/task.js';
 import Activity from '../../model/activity.js';
 import Notification from '../../model/notification.js';
@@ -273,7 +275,80 @@ export const deleteWorkspace = async (req, res) => {
 
     await logAdminAction(req, 'Workspace Deleted', board._id, board.title, `Workspace ${board.title} deleted permanently`);
 
-    await Task.deleteMany({ boardId });
+    // 1. Fetch all task IDs of this board
+    let taskIds = [];
+    try {
+      const tasks = await Task.find({ boardId }).select('_id');
+      taskIds = tasks.map((t) => t._id);
+    } catch (e) {
+      console.error('Error fetching task IDs for cascade delete:', e);
+    }
+
+    // 2. Delete task chat messages
+    if (taskIds.length > 0) {
+      try {
+        const TaskChatMessage = mongoose.model('TaskChatMessage');
+        if (TaskChatMessage) {
+          await TaskChatMessage.deleteMany({ taskId: { $in: taskIds } });
+        }
+      } catch (e) {
+        console.error('Error cascade deleting task chat messages:', e);
+      }
+    }
+
+    // 3. Delete attachments (files from disk and database documents)
+    try {
+      const Attachment = mongoose.model('Attachment');
+      if (Attachment) {
+        const attachments = await Attachment.find({ boardId });
+        for (const att of attachments) {
+          if (att.url) {
+            const filename = path.basename(att.url);
+            const filePath = path.join(process.cwd(), 'uploads', filename);
+            if (fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath);
+            }
+          }
+        }
+        await Attachment.deleteMany({ boardId });
+      }
+    } catch (e) {
+      console.error('Error cascade deleting attachments:', e);
+    }
+
+    // 4. Delete board chat messages
+    try {
+      const BoardChatMessage = mongoose.model('BoardChatMessage');
+      if (BoardChatMessage) {
+        await BoardChatMessage.deleteMany({ boardId });
+      }
+    } catch (e) {
+      console.error('Error cascade deleting board chat messages:', e);
+    }
+
+    // 5. Delete activities
+    try {
+      const Activity = mongoose.model('Activity');
+      if (Activity) {
+        await Activity.deleteMany({ boardId });
+      }
+    } catch (e) {
+      console.error('Error cascade deleting activities:', e);
+    }
+
+    // 6. Delete notifications related to the board
+    try {
+      const Notification = mongoose.model('Notification');
+      if (Notification) {
+        await Notification.deleteMany({ boardId });
+      }
+    } catch (e) {
+      console.error('Error cascade deleting notifications:', e);
+    }
+
+    // 7. Delete all tasks in this board
+    await Task.deleteMany({ boardId: new mongoose.Types.ObjectId(boardId) });
+
     await Board.findByIdAndDelete(boardId);
 
     try {

@@ -1,5 +1,7 @@
 import User from '../../model/userModel.js';
 import Board from '../../model/board.js';
+import fs from 'fs';
+import path from 'path';
 import Task from '../../model/task.js';
 import Activity from '../../model/activity.js';
 import Notification from '../../model/notification.js';
@@ -84,8 +86,8 @@ export const updateUserRole = async (req, res) => {
     }
 
     // Protect the primary Admin
-    if (user.email === 'yatnesh@admin.com') {
-      return res.status(400).json({ message: 'Cannot demote or change the role of the primary Admin' });
+    if (user.email && user.email.endsWith('@admin.com')) {
+      return res.status(400).json({ message: 'Cannot demote or change the role of an Admin' });
     }
 
     // Ensure role is valid
@@ -138,8 +140,8 @@ export const toggleUserBlock = async (req, res) => {
     }
 
     // Protect primary Admin
-    if (user.email === 'yatnesh@admin.com') {
-      return res.status(400).json({ message: 'Cannot block the primary Admin account' });
+    if (user.email && user.email.endsWith('@admin.com')) {
+      return res.status(400).json({ message: 'Cannot block an Admin account' });
     }
 
     user.isBlocked = isBlocked;
@@ -177,9 +179,9 @@ export const forceLogoutUser = async (req, res) => {
     }
 
     // Protect primary Admin
-    if (user.email === 'yatnesh@admin.com') {
-      if (req.user?.email !== 'yatnesh@admin.com') {
-        return res.status(400).json({ message: 'Cannot force logout the primary Admin' });
+    if (user.email && user.email.endsWith('@admin.com')) {
+      if (!req.user?.email?.endsWith('@admin.com')) {
+        return res.status(400).json({ message: 'Cannot force logout an Admin account' });
       }
     }
 
@@ -212,8 +214,8 @@ export const resetUserAccess = async (req, res) => {
     }
 
     // Protect primary Admin
-    if (user.email === 'yatnesh@admin.com') {
-      return res.status(400).json({ message: 'Cannot reset access for the primary Admin' });
+    if (user.email && user.email.endsWith('@admin.com')) {
+      return res.status(400).json({ message: 'Cannot reset access for an Admin account' });
     }
 
     const tempPassword = 'UserReset123!';
@@ -247,11 +249,115 @@ export const deleteUser = async (req, res) => {
     }
 
     // Protect primary Admin
-    if (user.email === 'yatnesh@admin.com') {
-      return res.status(400).json({ message: 'Cannot delete the primary Admin account' });
+    if (user.email && user.email.endsWith('@admin.com')) {
+      return res.status(400).json({ message: 'Cannot delete an Admin account' });
     }
 
     await logAdminAction(req, 'User Deleted', user._id, user.name, `User ${user.email} deleted permanently`);
+
+    // Find all boards owned by the user
+    const boardsOwned = await Board.find({ createdBy: userId });
+    const boardIds = boardsOwned.map((b) => b._id);
+
+    // Find all tasks related to the user's workspaces or created by the user
+    const tasksToDelete = await Task.find({
+      $or: [
+        { boardId: { $in: boardIds } },
+        { createdBy: userId }
+      ]
+    }).select('_id');
+    const taskIds = tasksToDelete.map((t) => t._id);
+
+    // 1. Delete task chat messages
+    if (taskIds.length > 0) {
+      try {
+        const TaskChatMessage = mongoose.model('TaskChatMessage');
+        if (TaskChatMessage) {
+          await TaskChatMessage.deleteMany({ taskId: { $in: taskIds } });
+        }
+      } catch (e) {
+        console.error('Error cascade deleting task chat messages:', e);
+      }
+    }
+
+    // 2. Delete attachments (files from disk and database documents)
+    try {
+      const Attachment = mongoose.model('Attachment');
+      if (Attachment) {
+        const attachments = await Attachment.find({
+          $or: [
+            { boardId: { $in: boardIds } },
+            { taskId: { $in: taskIds } },
+            { uploadedBy: userId }
+          ]
+        });
+        for (const att of attachments) {
+          if (att.url) {
+            const filename = path.basename(att.url);
+            const filePath = path.join(process.cwd(), 'uploads', filename);
+            if (fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath);
+            }
+          }
+        }
+        await Attachment.deleteMany({
+          $or: [
+            { boardId: { $in: boardIds } },
+            { taskId: { $in: taskIds } },
+            { uploadedBy: userId }
+          ]
+        });
+      }
+    } catch (e) {
+      console.error('Error cascade deleting attachments:', e);
+    }
+
+    // 3. Delete board chat messages for owned boards
+    try {
+      const BoardChatMessage = mongoose.model('BoardChatMessage');
+      if (BoardChatMessage) {
+        await BoardChatMessage.deleteMany({ boardId: { $in: boardIds } });
+      }
+    } catch (e) {
+      console.error('Error cascade deleting board chat messages:', e);
+    }
+
+    // 4. Delete activities for owned boards
+    try {
+      const Activity = mongoose.model('Activity');
+      if (Activity) {
+        await Activity.deleteMany({ boardId: { $in: boardIds } });
+      }
+    } catch (e) {
+      console.error('Error cascade deleting activities:', e);
+    }
+
+    // 5. Delete notifications related to the user or owned boards
+    try {
+      const Notification = mongoose.model('Notification');
+      if (Notification) {
+        await Notification.deleteMany({
+          $or: [
+            { boardId: { $in: boardIds } },
+            { taskId: { $in: taskIds } },
+            { recipient: userId },
+            { sender: userId }
+          ]
+        });
+      }
+    } catch (e) {
+      console.error('Error cascade deleting notifications:', e);
+    }
+
+    // 6. Delete all tasks
+    if (taskIds.length > 0) {
+      await Task.deleteMany({ _id: { $in: taskIds } });
+    }
+
+    // 7. Delete owned boards
+    if (boardIds.length > 0) {
+      await Board.deleteMany({ _id: { $in: boardIds } });
+    }
 
     // Remove user from board memberships
     await Board.updateMany(

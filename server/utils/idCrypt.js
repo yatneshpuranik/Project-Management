@@ -2,9 +2,23 @@ import crypto from 'crypto';
 import mongoose from 'mongoose';
 
 const algorithm = 'aes-128-cbc';
+
+let primaryKey = null;
 const getKey = () => {
-  return crypto.scryptSync(process.env.JWT_SECRET || 'your-secret-key-fallback', 'salt', 16);
+  if (!primaryKey) {
+    primaryKey = crypto.scryptSync(process.env.JWT_SECRET || 'your-secret-key-fallback', 'salt', 16);
+  }
+  return primaryKey;
 };
+
+let fallbackKey = null;
+const getFallbackKey = () => {
+  if (!fallbackKey) {
+    fallbackKey = crypto.scryptSync('your-secret-key-fallback', 'salt', 16);
+  }
+  return fallbackKey;
+};
+
 const iv = Buffer.alloc(16, 0); // stable IV
 
 /**
@@ -35,8 +49,7 @@ export const decryptId = (encId) => {
     return decrypted;
   } catch (err) {
     try {
-      const fallbackKey = crypto.scryptSync('your-secret-key-fallback', 'salt', 16);
-      const decipher = crypto.createDecipheriv(algorithm, fallbackKey, iv);
+      const decipher = crypto.createDecipheriv(algorithm, getFallbackKey(), iv);
       let decrypted = decipher.update(encIdStr, 'hex', 'utf8');
       decrypted += decipher.final('utf8');
       return decrypted;
