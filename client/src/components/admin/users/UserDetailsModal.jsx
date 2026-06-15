@@ -23,7 +23,7 @@ const UserDetailsModal = ({
     );
   }
 
-  // Prevent admin from blocking/deleting self or any admin email ending with @admin.com
+  
   const isProtectedAdmin = selectedUser.email && selectedUser.email.endsWith('@admin.com');
 
   const workspaces = selectedUserDetails?.workspaces || [];

@@ -145,7 +145,7 @@ export const respondToInvitation = async (req, res) => {
           await approvalNotification.save();
         }
 
-        // Socket events for member added
+        
         try {
           const io = getIo();
           const encryptedUser = encryptUserIds(targetUser);
