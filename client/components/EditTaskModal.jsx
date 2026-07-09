@@ -26,6 +26,8 @@ const EditTaskModal = ({ isOpen, onClose, task, boardId }) => {
   const [assignedTo, setAssignedTo] = useState(
     task.assignedTo?._id || task.assignedTo || ''
   );
+  const [labels, setLabels] = useState(task.labels || []);
+  const [labelInput, setLabelInput] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -40,6 +42,8 @@ const EditTaskModal = ({ isOpen, onClose, task, boardId }) => {
     setStatus(task.status || 'Todo');
     setProgress(task.progress || 0);
     setAssignedTo(task.assignedTo?._id || task.assignedTo || '');
+    setLabels(task.labels || []);
+    setLabelInput('');
   }, [isOpen, task]);
 
   const handleSubmitUpdates = async (e) => {
@@ -64,6 +68,7 @@ const EditTaskModal = ({ isOpen, onClose, task, boardId }) => {
         status,
         progress: parseInt(progress, 10),
         assignedTo: assignedTo || undefined,
+        labels,
       };
 
       const resultAction = await dispatch(updateTask({ taskId: task._id, data }));
@@ -247,6 +252,53 @@ const EditTaskModal = ({ isOpen, onClose, task, boardId }) => {
                 <span>75%</span>
                 <span>100%</span>
               </div>
+            </div>
+
+            {/* Labels Management */}
+            <div className="space-y-3 pt-2">
+              <span className="text-slate-300 text-xs font-semibold block">Labels</span>
+              <div className="flex flex-wrap gap-1.5 min-h-[24px]">
+                {labels.map((lbl, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center gap-1 rounded bg-slate-800 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-200 border border-white/5"
+                  >
+                    {lbl}
+                    {isOwner && (
+                      <button
+                        type="button"
+                        onClick={() => setLabels(labels.filter((_, i) => i !== idx))}
+                        className="text-slate-500 hover:text-slate-300 font-bold ml-0.5 cursor-pointer"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </span>
+                ))}
+              </div>
+              {isOwner && (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="New label..."
+                    value={labelInput}
+                    onChange={(e) => setLabelInput(e.target.value)}
+                    className="rounded-xl border border-white/10 bg-slate-950 px-3 py-1.5 text-xs text-white placeholder-slate-500 outline-none focus:border-sky-500/60"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (labelInput.trim() && !labels.includes(labelInput.trim())) {
+                        setLabels([...labels, labelInput.trim()]);
+                        setLabelInput('');
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-xl text-xs transition cursor-pointer"
+                  >
+                    Add Label
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Form actions */}

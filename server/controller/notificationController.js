@@ -7,6 +7,7 @@ import AuditLog from '../model/auditLog.js';
 import { createActivity } from './activityController.js';
 import { encryptUserIds, encryptId } from '../utils/idCrypt.js';
 import { getIo, emitToUser } from '../socket/socket.js';
+import { sendInvitationStatusEmail } from '../utils/emailService.js';
 
 // Get notifications for current user
 export const getNotifications = async (req, res) => {
@@ -143,6 +144,11 @@ export const respondToInvitation = async (req, res) => {
             message: `${userName} accepted your invitation to join workspace: "${board.title}"`,
           });
           await approvalNotification.save();
+
+          const ownerUser = await User.findById(board.createdBy);
+          if (ownerUser && targetUser) {
+            await sendInvitationStatusEmail('accepted', ownerUser.email, ownerUser.name, targetUser.email, targetUser.name, board.title);
+          }
         }
 
         
@@ -235,6 +241,13 @@ export const respondToInvitation = async (req, res) => {
             : `${userName} rejected your invitation to join workspace: "${board.title}"`,
         });
         await rejectionNotification.save();
+
+        if (!isAccessRequest) {
+          const ownerUser = await User.findById(notification.sender);
+          if (ownerUser && targetUser) {
+            await sendInvitationStatusEmail('rejected', ownerUser.email, ownerUser.name, targetUser.email, targetUser.name, board.title);
+          }
+        }
 
         // Socket events for invitation/request rejected
         try {

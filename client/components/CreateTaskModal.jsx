@@ -18,6 +18,8 @@ const CreateTaskModal = ({ isOpen, onClose, boardId, defaultStatus = 'Todo' }) =
     assignedTo: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [labels, setLabels] = useState([]);
+  const [labelInput, setLabelInput] = useState('');
 
   useEffect(() => {
     /* eslint-disable-next-line react-hooks/set-state-in-effect */
@@ -51,6 +53,7 @@ const CreateTaskModal = ({ isOpen, onClose, boardId, defaultStatus = 'Todo' }) =
         dueDate: formData.dueDate || undefined,
         status: formData.status,
         assignedTo: formData.assignedTo || undefined,
+        labels,
         boardId,
       };
 
@@ -62,6 +65,8 @@ const CreateTaskModal = ({ isOpen, onClose, boardId, defaultStatus = 'Todo' }) =
         });
 
         setFormData({ title: '', description: '', priority: 'Low', dueDate: '', status: defaultStatus, assignedTo: '' });
+        setLabels([]);
+        setLabelInput('');
         onClose();
       }
     } catch (error) {
@@ -171,6 +176,49 @@ const CreateTaskModal = ({ isOpen, onClose, boardId, defaultStatus = 'Todo' }) =
                 ))}
               </select>
             </label>
+          </div>
+
+          {/* Labels Section */}
+          <div className="space-y-3 pt-2">
+            <span className="text-slate-300 text-xs font-semibold block">Labels</span>
+            <div className="flex flex-wrap gap-1.5 min-h-[24px]">
+              {labels.map((lbl, idx) => (
+                <span
+                  key={idx}
+                  className="inline-flex items-center gap-1 rounded bg-slate-800 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-200 border border-white/5 animate-fade-in"
+                >
+                  {lbl}
+                  <button
+                    type="button"
+                    onClick={() => setLabels(labels.filter((_, i) => i !== idx))}
+                    className="text-slate-500 hover:text-slate-350 font-bold ml-0.5 cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="New label..."
+                value={labelInput}
+                onChange={(e) => setLabelInput(e.target.value)}
+                className="rounded-2xl border border-white/10 bg-slate-950 px-4 py-2.5 text-xs text-white placeholder-slate-500 outline-none focus:border-sky-500/60 focus:ring-2 focus:ring-sky-500/10"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (labelInput.trim() && !labels.includes(labelInput.trim())) {
+                    setLabels([...labels, labelInput.trim()]);
+                    setLabelInput('');
+                  }
+                }}
+                className="px-4 py-2 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-2xl text-xs transition cursor-pointer"
+              >
+                Add Label
+              </button>
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 border-t border-white/10 pt-5 mt-6">

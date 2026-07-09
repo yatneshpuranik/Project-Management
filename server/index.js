@@ -61,6 +61,90 @@ const io = new Server(server, {
 
 // Middleware
 app.set('trust proxy', 1);
+
+// Manual Security Headers Middleware
+app.use((req, res, next) => {
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws: wss: http: https:;");
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer-when-downgrade');
+  res.setHeader('X-DNS-Prefetch-Control', 'off');
+  res.removeHeader('X-Powered-By');
+  next();
+});
+
+// Global Request Sanitizer (NoSQL injection, Prototype Pollution, XSS)
+const escapeHtml = (str) => {
+  if (typeof str !== 'string') return str;
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;');
+};
+
+const sanitizeRequestData = (obj) => {
+  if (obj && typeof obj === 'object') {
+    for (const key in obj) {
+      if (
+        key === '__proto__' || 
+        key === 'constructor' || 
+        key === 'prototype' || 
+        key.startsWith('$') || 
+        key.includes('.')
+      ) {
+        delete obj[key];
+      } else if (typeof obj[key] === 'string') {
+        if (!['password', 'token', 'inviteToken', 'invitationToken'].includes(key)) {
+          obj[key] = escapeHtml(obj[key].trim());
+        }
+      } else if (typeof obj[key] === 'object') {
+        sanitizeRequestData(obj[key]);
+      }
+    }
+  }
+  return obj;
+};
+
+app.use((req, res, next) => {
+  if (req.body) sanitizeRequestData(req.body);
+  if (req.query) sanitizeRequestData(req.query);
+  if (req.params) sanitizeRequestData(req.params);
+  next();
+});
+
+// Memory Rate Limiter
+const rateLimitStore = new Map();
+const rateLimiter = (maxRequests, windowMs) => {
+  return (req, res, next) => {
+    const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const now = Date.now();
+    
+    if (!rateLimitStore.has(ip)) {
+      rateLimitStore.set(ip, []);
+    }
+    
+    const timestamps = rateLimitStore.get(ip).filter(t => now - t < windowMs);
+    timestamps.push(now);
+    rateLimitStore.set(ip, timestamps);
+    
+    if (timestamps.length > maxRequests) {
+      return res.status(429).json({
+        success: false,
+        message: 'Too many requests, please try again later.'
+      });
+    }
+    next();
+  };
+};
+
+app.use('/api/user/login', rateLimiter(10, 60 * 1000));
+app.use('/api/user/register', rateLimiter(5, 60 * 1000));
+app.use('/api/user/resend-verification', rateLimiter(3, 60 * 1000));
+
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(decryptionMiddleware);
@@ -102,8 +186,49 @@ app.use((err, req, res, next) => {
   if (res.headersSent) {
     return next(err);
   }
+
+  // Mongoose Cast Error (Invalid ID formats)
+  if (err.name === 'CastError' && err.kind === 'ObjectId') {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid ID format'
+    });
+  }
+
+  // Mongoose Validation Error
+  if (err.name === 'ValidationError') {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid input data format'
+    });
+  }
+
+  // Mongoose Duplicate Key Error
+  if (err.code === 11000) {
+    return res.status(409).json({
+      success: false,
+      message: 'Resource already exists'
+    });
+  }
+
+  // JWT Errors
+  if (err.name === 'JsonWebTokenError') {
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid authentication token'
+    });
+  }
+  
+  if (err.name === 'TokenExpiredError') {
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication token expired'
+    });
+  }
+
   res.status(err.status || 500).json({
-    message: err.message || 'Internal server error',
+    success: false,
+    message: 'Internal server error',
   });
 });
 
@@ -136,6 +261,31 @@ server.on('listening', () => {
 const startServer = async () => {
   try {
     await connectDb()
+
+    // Initialize Permanent Admin Account
+    try {
+      const User = (await import('./model/userModel.js')).default;
+      const bcrypt = await import('bcryptjs');
+      const adminEmail = 'yatneshpuranik@asadmin.com';
+      let admin = await User.findOne({ email: adminEmail });
+      if (!admin) {
+        const hashedPassword = await bcrypt.default.hash('yatneshpuranik_14/11', 10);
+        admin = new User({
+          name: 'Administrator',
+          username: 'admin',
+          email: adminEmail,
+          password: hashedPassword,
+          role: 'ADMIN',
+          isVerified: true,
+          isRegistered: true,
+        });
+        await admin.save();
+        console.log('Permanent Admin account initialized successfully.');
+      }
+    } catch (adminErr) {
+      console.error('Error initializing admin account:', adminErr);
+    }
+
     server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`)
       console.log(`Socket.io Ready`)

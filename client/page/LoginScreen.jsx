@@ -1,26 +1,70 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { setUser } from '../redux/userSlice.js';
 import axiosInstance from '../utils/axiosInstance.js';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { HiOutlineUser, HiOutlineMail, HiOutlineLockClosed, HiOutlineArrowRight, HiOutlineViewBoards } from 'react-icons/hi';
 import { motion, useMotionValue, useSpring, useTransform, AnimatePresence } from 'framer-motion';
 
 const LoginScreen = () => {
-  const [isRegister, setIsRegister] = useState(false);
+  const [searchParams] = useSearchParams();
+  const inviteToken = searchParams.get('inviteToken');
+  const [isRegister, setIsRegister] = useState(Boolean(inviteToken));
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showResend, setShowResend] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (inviteToken) {
+      setIsRegister(true);
+    }
+  }, [inviteToken]);
+
+  useEffect(() => {
+    if (searchParams.get('verified') === 'true') {
+      setIsRegister(false); // Make sure we are on login tab
+      setSuccess('Email verified successfully. You can now login using your credentials.');
+      // Remove query parameter from url without breaking state
+      navigate('/login', { replace: true });
+      
+      const timer = setTimeout(() => {
+        setSuccess(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams, navigate]);
+
+  const handleResendVerification = async () => {
+    if (!email.trim()) {
+      setError('Please enter your email to resend verification.');
+      return;
+    }
+    setResendLoading(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const response = await axiosInstance.post('/user/resend-verification', { email });
+      setSuccess(response.data.message || 'Verification email sent successfully.');
+      setShowResend(false);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to resend verification email.');
+    } finally {
+      setResendLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
+    setShowResend(false);
     setLoading(true);
 
     if (isRegister && (!name.trim() || !email.trim() || !password.trim())) {
@@ -35,7 +79,9 @@ const LoginScreen = () => {
       return;
     }
 
-    const payload = isRegister ? { name, email, password } : { email, password };
+    const payload = isRegister 
+      ? { name, email, password, invitationToken: inviteToken || undefined } 
+      : { email, password };
 
     try {
       const result = await axiosInstance.post(
@@ -44,21 +90,26 @@ const LoginScreen = () => {
       );
 
       if (isRegister) {
-        setSuccess('Registration successful! Logging you in...');
-        setTimeout(() => {
-          localStorage.setItem('token', result.data.token);
-          localStorage.setItem('userId', result.data.user._id);
-          localStorage.setItem('userName', result.data.user.name);
-          localStorage.setItem('userEmail', result.data.user.email);
-          const role = result.data.user.role || 'USER';
-          localStorage.setItem('userRole', role);
-          dispatch(setUser(result.data.user));
-          if (role === 'ADMIN') {
-            navigate('/admin');
-          } else {
-            navigate('/boards');
-          }
-        }, 1200);
+        if (result.data.isUnverified) {
+          setSuccess(result.data.message || 'Registration successful! Please check your email to verify.');
+          // Do not log in yet
+        } else {
+          setSuccess('Registration successful! Logging you in...');
+          setTimeout(() => {
+            localStorage.setItem('token', result.data.token);
+            localStorage.setItem('userId', result.data.user._id);
+            localStorage.setItem('userName', result.data.user.name);
+            localStorage.setItem('userEmail', result.data.user.email);
+            const role = result.data.user.role || 'USER';
+            localStorage.setItem('userRole', role);
+            dispatch(setUser(result.data.user));
+            if (role === 'ADMIN') {
+              navigate('/admin');
+            } else {
+              navigate('/boards');
+            }
+          }, 1200);
+        }
       } else {
         localStorage.setItem('token', result.data.token);
         localStorage.setItem('userId', result.data.user._id);
@@ -75,6 +126,9 @@ const LoginScreen = () => {
       }
     } catch (err) {
       console.error('Auth request failed:', err);
+      if (err.response?.data?.isUnverified) {
+        setShowResend(true);
+      }
       const networkMessage =
         err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')
           ? 'Network Error: Unable to reach the authentication server. Check backend status and your connection.'
@@ -86,9 +140,7 @@ const LoginScreen = () => {
           ? err.response.data?.message || 'Invalid Credentials: Email/username or password is incorrect.'
           : err.response.status === 404
             ? 'Server Error: Authentication endpoint not found.'
-            : err.response.status >= 500
-              ? 'Server Error: An error occurred on the backend. Please try again later.'
-              : err.response.data?.message
+            : err.response.data?.message
         : null;
 
       setError(networkMessage || statusMessage || 'Authentication failed. Please check your credentials.');
@@ -201,9 +253,19 @@ const LoginScreen = () => {
               <motion.div 
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300"
+                className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300 space-y-2"
               >
-                {error}
+                <div>{error}</div>
+                {showResend && (
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    disabled={resendLoading}
+                    className="inline-flex items-center justify-center font-bold px-3 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs rounded-xl transition duration-150 cursor-pointer disabled:opacity-50"
+                  >
+                    {resendLoading ? 'Sending...' : 'Resend Verification Email'}
+                  </button>
+                )}
               </motion.div>
             )}
             {success && (

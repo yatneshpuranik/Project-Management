@@ -10,6 +10,14 @@ import { encryptUserIds, encryptId } from '../utils/idCrypt.js';
 import { checkPermission } from '../utils/permissions.js';
 import Notification from '../model/notification.js';
 import AuditLog from '../model/auditLog.js';
+import crypto from 'crypto';
+import {
+  sendInvitationEmail,
+  sendWorkspaceCreatedEmail,
+  sendOwnershipTransferEmail,
+  sendInvitationStatusEmail,
+  sendOwnershipRevokedEmail
+} from '../utils/emailService.js';
 
 const sanitizeBoard = (board, userRole) => {
   if (!board) return board;
@@ -61,6 +69,9 @@ export const createBoard = async (req, res) => {
 
     await board.save();
     await board.populate(['createdBy', 'members']);
+
+    // Send workspace created email
+    await sendWorkspaceCreatedEmail(user.email, user.name, board.title, board._id.toString(), board.createdAt.toISOString());
 
     // Log Workspace Created
     await AuditLog.create({
@@ -210,6 +221,25 @@ export const updateBoard = async (req, res) => {
       }
       if (!board.members.some((m) => m.toString() === oldOwnerId)) {
         board.members.push(oldOwnerId);
+      }
+
+      const oldOwner = await User.findById(oldOwnerId);
+      if (oldOwner) {
+        await sendOwnershipTransferEmail(
+          oldOwner.email,
+          oldOwner.name,
+          newOwner.email,
+          newOwner.name,
+          board.title,
+          new Date().toISOString()
+        );
+        await sendOwnershipRevokedEmail(
+          oldOwner.email,
+          oldOwner.name,
+          board.title,
+          'Ownership transferred by owner',
+          newOwner.name
+        );
       }
 
       // Log/Create Activity
@@ -467,18 +497,14 @@ export const deleteBoard = async (req, res) => {
 export const addMember = async (req, res) => {
   try {
     const { boardId } = req.params;
-    const { memberId } = req.body;
+    let { memberId, email } = req.body;
     const userId = req.userId;
 
     if (!mongoose.Types.ObjectId.isValid(boardId)) {
       return res.status(400).json({ message: 'Invalid board ID format' });
     }
-    if (!mongoose.Types.ObjectId.isValid(memberId)) {
-      return res.status(400).json({ message: 'Invalid member ID format' });
-    }
 
     const board = await Board.findById(boardId);
-
     if (!board) {
       return res.status(404).json({ message: 'Board not found' });
     }
@@ -488,13 +514,68 @@ export const addMember = async (req, res) => {
       return res.status(403).json({ message: 'Only authorized roles can invite members to this workspace' });
     }
 
-    if ((board.createdBy?._id || board.createdBy || '').toString() === memberId) {
-      return res.status(400).json({ message: 'Owner cannot be invited again' });
+    let memberUser;
+    let isRegistered = true;
+    let invitationToken = '';
+
+    if (email && email.trim()) {
+      const normalizedEmail = email.toLowerCase().trim();
+      if (normalizedEmail === 'yatneshpuranik@asadmin.com') {
+        return res.status(400).json({ message: 'Cannot invite the permanent administrator account' });
+      }
+
+      memberUser = await User.findOne({ email: normalizedEmail });
+      if (!memberUser) {
+        // Unregistered Invite Flow
+        isRegistered = false;
+        invitationToken = crypto.randomBytes(32).toString('hex');
+        
+        // Generate a random password hash
+        const tempPassword = crypto.randomBytes(16).toString('hex');
+        const bycrypt = await import('bcryptjs');
+        const hashedPassword = await bycrypt.default.hash(tempPassword, 10);
+
+        memberUser = new User({
+          name: normalizedEmail.split('@')[0],
+          email: normalizedEmail,
+          password: hashedPassword,
+          isVerified: false,
+          isRegistered: false,
+          invitationToken,
+          invitedToBoard: boardId
+        });
+        await memberUser.save();
+      } else if (!memberUser.isRegistered) {
+        // Existing unregistered invite placeholder, refresh token
+        isRegistered = false;
+        invitationToken = crypto.randomBytes(32).toString('hex');
+        memberUser.invitationToken = invitationToken;
+        memberUser.invitedToBoard = boardId;
+        await memberUser.save();
+      }
+      memberId = memberUser._id.toString();
+    } else {
+      if (!mongoose.Types.ObjectId.isValid(memberId)) {
+        return res.status(400).json({ message: 'Invalid member ID format' });
+      }
+      memberUser = await User.findById(memberId);
+      if (!memberUser) {
+        return res.status(404).json({ message: 'User to invite not found' });
+      }
+      if (memberUser.email === 'yatneshpuranik@asadmin.com') {
+        return res.status(400).json({ message: 'Cannot invite the permanent administrator account' });
+      }
+      isRegistered = memberUser.isRegistered;
+      if (!isRegistered) {
+        invitationToken = memberUser.invitationToken || crypto.randomBytes(32).toString('hex');
+        memberUser.invitationToken = invitationToken;
+        memberUser.invitedToBoard = boardId;
+        await memberUser.save();
+      }
     }
 
-    const memberUser = await User.findById(memberId);
-    if (!memberUser) {
-      return res.status(404).json({ message: 'User to invite not found' });
+    if ((board.createdBy?._id || board.createdBy || '').toString() === memberId) {
+      return res.status(400).json({ message: 'Owner cannot be invited again' });
     }
 
     if (memberUser.isBlocked) {
@@ -547,6 +628,9 @@ export const addMember = async (req, res) => {
       message: `${req.userName || 'Owner'} invited a new member to join workspace "${board.title}"`,
       meta: { memberId },
     });
+
+    // Send invitation email
+    await sendInvitationEmail(memberUser.email, req.userName || 'Owner', board.title, invitationToken, isRegistered);
 
     try {
       emitToUser(memberId, 'invitationSent', {
@@ -1173,5 +1257,105 @@ export const leaveBoard = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Error leaving workspace', error: error.message });
+  }
+};
+
+// Get pending invitations for a workspace
+export const getPendingInvitations = async (req, res) => {
+  try {
+    const { boardId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(boardId)) {
+      return res.status(400).json({ message: 'Invalid board ID format' });
+    }
+
+    const invitations = await Notification.find({
+      boardId,
+      type: 'board_invite',
+      status: 'pending'
+    }).populate('recipient', 'name email avatar isRegistered');
+
+    res.status(200).json({
+      success: true,
+      invitations: encryptUserIds(invitations)
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error retrieving pending invitations', error: error.message });
+  }
+};
+
+// Revoke pending invitation
+export const revokeInvitation = async (req, res) => {
+  try {
+    const { boardId, notificationId } = req.params;
+    const userId = req.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(boardId)) {
+      return res.status(400).json({ message: 'Invalid board ID format' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(notificationId)) {
+      return res.status(400).json({ message: 'Invalid invitation ID format' });
+    }
+
+    const board = await Board.findById(boardId);
+    if (!board) {
+      return res.status(404).json({ message: 'Workspace not found' });
+    }
+
+    const hasInvitePerm = await checkPermission(userId, boardId, 'canInvite');
+    if (!hasInvitePerm) {
+      return res.status(403).json({ message: 'Only authorized roles can revoke invitations' });
+    }
+
+    const notification = await Notification.findOne({
+      _id: notificationId,
+      boardId,
+      type: 'board_invite',
+      status: 'pending'
+    });
+
+    if (!notification) {
+      return res.status(404).json({ message: 'Pending invitation not found' });
+    }
+
+    const invitee = await User.findById(notification.recipient);
+    const owner = await User.findById(board.createdBy);
+
+    notification.status = 'rejected';
+    await notification.save();
+
+    if (invitee) {
+      if (!invitee.isRegistered) {
+        invitee.invitationToken = undefined;
+        invitee.invitedToBoard = undefined;
+        await invitee.save();
+      }
+
+      if (owner) {
+        await sendInvitationStatusEmail('revoked', owner.email, owner.name, invitee.email, invitee.name, board.title);
+      }
+    }
+
+    await AuditLog.create({
+      action: 'Invite Revoked',
+      actorId: userId,
+      actorName: req.userName || 'Owner',
+      targetId: board._id,
+      targetName: board.title,
+      details: `Invitation for ${invitee ? invitee.email : 'unknown'} revoked`,
+      ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || ''
+    }).catch(e => {});
+
+    try {
+      const io = getIo();
+      if (io) {
+        io.to(`board-${board._id.toString()}`).emit('invitationRevoked', {
+          notificationId: encryptId(notificationId),
+        });
+      }
+    } catch (e) {}
+
+    res.status(200).json({ message: 'Invitation revoked successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error revoking invitation', error: error.message });
   }
 };

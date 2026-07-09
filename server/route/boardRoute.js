@@ -12,7 +12,9 @@ import {
   requestAccess,
   acceptAccessRequest,
   rejectAccessRequest,
-  leaveBoard
+  leaveBoard,
+  revokeInvitation,
+  getPendingInvitations
 } from '../controller/boardController.js';
 import {
   getBoardChatMessages,
@@ -46,6 +48,8 @@ router.delete('/:boardId', deleteBoard);
 router.post('/:boardId/members', addMember);
 router.delete('/:boardId/members/:memberId', removeMember);
 router.post('/:boardId/leave', leaveBoard);
+router.delete('/:boardId/invitations/:notificationId', revokeInvitation);
+router.get('/:boardId/invitations', getPendingInvitations);
 
 // Workspace Chat Routes
 router.get('/:boardId/chat', getBoardChatMessages);

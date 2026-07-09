@@ -356,7 +356,23 @@ const SettingsScreen = () => {
                               </span>
                             </div>
                             {!isSelf && (
-                              <div className="flex gap-1">
+                              <div className="flex gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (!window.confirm(`Are you sure you want to transfer ownership of this workspace to ${member.name}? This will revoke your owner privileges.`)) return;
+                                    try {
+                                      await axiosInstance.put(`/boards/${currentBoard._id}`, { createdBy: member._id });
+                                      toast.success('Ownership transferred successfully.');
+                                      navigate('/boards');
+                                    } catch (err) {
+                                      toast.error(err.response?.data?.message || 'Failed to transfer ownership.');
+                                    }
+                                  }}
+                                  className="px-2 py-1 bg-amber-500/15 border border-amber-500/25 rounded text-amber-400 hover:bg-amber-500 hover:text-white transition font-bold"
+                                >
+                                  Transfer Owner
+                                </button>
                                 <button
                                   type="button"
                                   onClick={async () => {

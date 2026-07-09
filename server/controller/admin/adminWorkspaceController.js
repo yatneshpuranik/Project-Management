@@ -9,6 +9,7 @@ import { encryptUserIds, encryptId } from '../../utils/idCrypt.js';
 import mongoose from 'mongoose';
 import { getIo, emitToUser } from '../../socket/socket.js';
 import { logAdminAction } from './adminController.js';
+import { sendOwnershipTransferEmail, sendOwnershipRevokedEmail } from '../../utils/emailService.js';
 
 // Get All Workspaces
 export const getWorkspaces = async (req, res) => {
@@ -123,6 +124,25 @@ export const transferWorkspaceOwnership = async (req, res) => {
     }
 
     await board.save();
+
+    const oldOwner = await User.findById(oldOwnerId);
+    if (oldOwner) {
+      await sendOwnershipTransferEmail(
+        oldOwner.email,
+        oldOwner.name,
+        newOwner.email,
+        newOwner.name,
+        board.title,
+        new Date().toISOString()
+      );
+      await sendOwnershipRevokedEmail(
+        oldOwner.email,
+        oldOwner.name,
+        board.title,
+        'Ownership transferred by Administrator',
+        newOwner.name
+      );
+    }
 
     await logAdminAction(req, 'Ownership Transfer', board._id, board.title, `Ownership transferred from ${oldOwnerId} to ${newOwnerId}`);
 

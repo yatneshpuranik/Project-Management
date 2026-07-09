@@ -6,6 +6,7 @@ import socket, { connectSocket, disconnectSocket } from '../utils/socket'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import ProfileScreen from '../page/ProfileScreen.jsx'
 import LoginScreen from '../page/LoginScreen.jsx'
+import VerifyEmailScreen from '../page/VerifyEmailScreen.jsx'
 import AllUser from '../page/AllUser.jsx'
 import Home from '../page/Home.jsx'
 import BoardsScreen from '../page/BoardsScreen.jsx'
@@ -146,6 +147,7 @@ const App = () => {
         <Routes>
           <Route path='/' element={<Home />} />
           <Route path='/login' element={user ? (user.role === 'ADMIN' ? <Navigate to='/admin' replace /> : <Navigate to='/boards' replace />) : <LoginScreen />} />
+          <Route path='/verify-email' element={<VerifyEmailScreen />} />
           
           {/* Protected Area Layout */}
           <Route

@@ -116,6 +116,14 @@ const taskSchema = new mongoose.Schema(
         },
       },
     ],
+    isArchived: {
+      type: Boolean,
+      default: false,
+    },
+    labels: {
+      type: [String],
+      default: [],
+    },
   },
   {
     timestamps: true,

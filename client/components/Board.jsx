@@ -24,6 +24,8 @@ const Board = ({ boardId }) => {
   const [priorityFilter, setPriorityFilter] = useState('All');
   const [assignedFilter, setAssignedFilter] = useState('All');
   const [dueFilter, setDueFilter] = useState('All');
+  const [labelFilter, setLabelFilter] = useState('All');
+  const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
     if (!boardId) return;
@@ -136,12 +138,20 @@ const Board = ({ boardId }) => {
         matchesDue = dueDate && dueDate < today;
       }
 
-      return matchesSearch && matchesPriority && matchesAssigned && matchesDue;
+      const matchesLabel = labelFilter === 'All' || (task.labels && task.labels.includes(labelFilter));
+      const matchesArchive = showArchived ? task.isArchived : !task.isArchived;
+
+      return matchesSearch && matchesPriority && matchesAssigned && matchesDue && matchesLabel && matchesArchive;
     });
-  }, [tasks, priorityFilter, assignedFilter, searchQuery, dueFilter]);
+  }, [tasks, priorityFilter, assignedFilter, searchQuery, dueFilter, labelFilter, showArchived]);
 
   const uniqueAssignees = useMemo(() => {
     return Array.from(new Set(tasks.map((task) => task.assignedTo?.name).filter(Boolean)));
+  }, [tasks]);
+
+  const uniqueLabels = useMemo(() => {
+    const allLabels = tasks.flatMap(t => t.labels || []);
+    return Array.from(new Set(allLabels));
   }, [tasks]);
 
   if (!boardId) {
@@ -228,6 +238,32 @@ const Board = ({ boardId }) => {
                 <option>This Week</option>
                 <option>Overdue</option>
               </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-slate-500 tracking-wider uppercase">Label:</span>
+              <select
+                value={labelFilter}
+                onChange={(e) => setLabelFilter(e.target.value)}
+                className="rounded-lg border border-white/10 bg-slate-955 px-2 py-1 text-xs text-white outline-none focus:border-sky-500"
+              >
+                <option>All</option>
+                {uniqueLabels.map((lbl) => (
+                  <option key={lbl}>{lbl}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <label className="inline-flex items-center gap-1.5 cursor-pointer text-slate-400 select-none">
+                <input
+                  type="checkbox"
+                  checked={showArchived}
+                  onChange={(e) => setShowArchived(e.target.checked)}
+                  className="rounded border-white/15 bg-slate-955 text-sky-500 focus:ring-0 cursor-pointer"
+                />
+                <span className="text-[10px] uppercase tracking-wider">Archived Only</span>
+              </label>
             </div>
           </div>
 

@@ -432,7 +432,7 @@ export const updateTask = async (req, res) => {
     const originalStatus = task.status;
 
     // Update remaining allowed fields
-    const allowedFields = ['title', 'description', 'priority', 'status', 'progress', 'openContribution'];
+    const allowedFields = ['title', 'description', 'priority', 'status', 'progress', 'openContribution', 'isArchived', 'labels'];
     allowedFields.forEach((field) => {
       if (updates[field] !== undefined) {
         task[field] = updates[field];
@@ -670,6 +670,10 @@ export const inviteToTask = async (req, res) => {
     const invitee = await User.findById(memberId);
     if (!invitee) {
       return res.status(404).json({ message: 'User to invite not found' });
+    }
+
+    if (invitee.email === 'yatneshpuranik@asadmin.com') {
+      return res.status(400).json({ message: 'Cannot invite the permanent administrator account' });
     }
 
     const notification = new Notification({

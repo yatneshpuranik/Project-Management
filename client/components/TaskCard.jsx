@@ -98,6 +98,16 @@ const TaskCard = ({ task, boardId, status }) => {
             </span>
           </div>
 
+          {task.labels && task.labels.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {task.labels.map((lbl, idx) => (
+                <span key={idx} className="rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider bg-slate-800 text-slate-300 border border-white/5">
+                  {lbl}
+                </span>
+              ))}
+            </div>
+          )}
+
           <div>
             <h4 className="text-sm font-semibold text-slate-100 line-clamp-2 group-hover:text-sky-400 transition-colors duration-200">{task.title}</h4>
           </div>

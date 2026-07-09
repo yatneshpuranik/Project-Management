@@ -1,5 +1,5 @@
 import express from "express";
-import { createUser, loginUser, getAllUsers, getUserByID, getCurrentUser, LogoutUser, blockUser, unblockUser, searchUsers, promoteUser, demoteUser, updatePresence, updateProfile } from "../controller/userController.js";
+import { createUser, loginUser, getAllUsers, getUserByID, getCurrentUser, LogoutUser, blockUser, unblockUser, searchUsers, promoteUser, demoteUser, updatePresence, updateProfile, verifyEmail, resendVerification } from "../controller/userController.js";
 import { authenticateToken } from "../middleware/auth.js";
 
 const router = express.Router();
@@ -7,6 +7,8 @@ const router = express.Router();
 router.post("/register", createUser);
 router.post("/login", loginUser);
 router.post("/logout", LogoutUser);
+router.get("/verify-email", verifyEmail);
+router.post("/resend-verification", resendVerification);
 
 router.use(authenticateToken);
 router.get("/me", getCurrentUser);

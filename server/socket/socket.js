@@ -110,6 +110,17 @@ const extractBoardId = (data) => {
   return null;
 };
 
+const checkSocketBoardMembership = async (userId, decBoardId) => {
+  if (!decBoardId || !userId) return false;
+  try {
+    const board = await Board.findById(decBoardId);
+    if (!board) return false;
+    return board.createdBy.toString() === userId || board.members.some(m => m.toString() === userId);
+  } catch (e) {
+    return false;
+  }
+};
+
 const authenticateSocket = async (socket, next) => {
   try {
     let token = socket.handshake.auth?.token || socket.handshake.query?.token;
@@ -243,84 +254,105 @@ const setupSocket = (io) => {
     });
 
     // Task created
-    socket.on('task-created', (data) => {
+    socket.on('task-created', async (data) => {
       const { boardId, task } = data;
       const decBoardId = decryptId(boardId);
+      const decUserId = socket.userId;
+      if (!(await checkSocketBoardMembership(decUserId, decBoardId))) {
+        return;
+      }
       const room = `board-${decBoardId}`;
-
       io.to(room).emit('task-created', { task });
       console.log(`Task created in board ${decBoardId}:`, task.title);
     });
 
     // Task updated
-    socket.on('task-updated', (data) => {
+    socket.on('task-updated', async (data) => {
       const { boardId, task } = data;
       const decBoardId = decryptId(boardId);
+      const decUserId = socket.userId;
+      if (!(await checkSocketBoardMembership(decUserId, decBoardId))) {
+        return;
+      }
       const room = `board-${decBoardId}`;
-
       io.to(room).emit('task-updated', { task });
       console.log(`Task updated in board ${decBoardId}:`, task.title);
     });
 
     // Task deleted
-    socket.on('task-deleted', (data) => {
+    socket.on('task-deleted', async (data) => {
       const { boardId, taskId } = data;
       const decBoardId = decryptId(boardId);
+      const decUserId = socket.userId;
+      if (!(await checkSocketBoardMembership(decUserId, decBoardId))) {
+        return;
+      }
       const room = `board-${decBoardId}`;
-
       io.to(room).emit('task-deleted', { taskId });
       console.log(`Task deleted from board ${decBoardId}: ${taskId}`);
     });
 
     // Task moved between statuses
-    socket.on('task-moved', (data) => {
+    socket.on('task-moved', async (data) => {
       const { boardId, task, fromStatus, toStatus } = data;
       const decBoardId = decryptId(boardId);
+      const decUserId = socket.userId;
+      if (!(await checkSocketBoardMembership(decUserId, decBoardId))) {
+        return;
+      }
       const room = `board-${decBoardId}`;
-
       io.to(room).emit('task-moved', {
         task,
         fromStatus,
         toStatus,
       });
-
       console.log(
         `Task moved in board ${decBoardId}: ${fromStatus} -> ${toStatus}`
       );
     });
 
     // Typing indicator - user is editing
-    socket.on('typing-start', (data) => {
+    socket.on('typing-start', async (data) => {
       const { boardId, taskId } = data;
       const decBoardId = decryptId(boardId);
+      const decUserId = socket.userId;
+      if (!(await checkSocketBoardMembership(decUserId, decBoardId))) {
+        return;
+      }
       const room = `board-${decBoardId}`;
-      const userId = socket.userId;
       const userName = socket.userName;
 
       socket.to(room).emit('typing-start', {
-        userId: encryptId(userId),
+        userId: encryptId(decUserId),
         userName,
         taskId,
       });
     });
 
     // User stopped typing
-    socket.on('typing-stop', (data) => {
+    socket.on('typing-stop', async (data) => {
       const { boardId, taskId } = data;
       const decBoardId = decryptId(boardId);
+      const decUserId = socket.userId;
+      if (!(await checkSocketBoardMembership(decUserId, decBoardId))) {
+        return;
+      }
       const room = `board-${decBoardId}`;
-      const userId = socket.userId;
 
       socket.to(room).emit('typing-stop', {
-        userId: encryptId(userId),
+        userId: encryptId(decUserId),
         taskId,
       });
     });
 
     // Board activity/comment
-    socket.on('comment-added', (data) => {
+    socket.on('comment-added', async (data) => {
       const { boardId, taskId, comment } = data;
       const decBoardId = decryptId(boardId);
+      const decUserId = socket.userId;
+      if (!(await checkSocketBoardMembership(decUserId, decBoardId))) {
+        return;
+      }
       const room = `board-${decBoardId}`;
 
       io.to(room).emit('comment-added', {
@@ -332,23 +364,35 @@ const setupSocket = (io) => {
     });
 
     // Camel-case Comment events for Feature 2
-    socket.on('commentAdded', (data) => {
+    socket.on('commentAdded', async (data) => {
       const { boardId, taskId, comment } = data;
       const decBoardId = decryptId(boardId);
+      const decUserId = socket.userId;
+      if (!(await checkSocketBoardMembership(decUserId, decBoardId))) {
+        return;
+      }
       const room = `board-${decBoardId}`;
       io.to(room).emit('commentAdded', { taskId, comment });
     });
 
-    socket.on('commentUpdated', (data) => {
+    socket.on('commentUpdated', async (data) => {
       const { boardId, taskId, comment } = data;
       const decBoardId = decryptId(boardId);
+      const decUserId = socket.userId;
+      if (!(await checkSocketBoardMembership(decUserId, decBoardId))) {
+        return;
+      }
       const room = `board-${decBoardId}`;
       io.to(room).emit('commentUpdated', { taskId, comment });
     });
 
-    socket.on('commentDeleted', (data) => {
+    socket.on('commentDeleted', async (data) => {
       const { boardId, taskId, commentId } = data;
       const decBoardId = decryptId(boardId);
+      const decUserId = socket.userId;
+      if (!(await checkSocketBoardMembership(decUserId, decBoardId))) {
+        return;
+      }
       const room = `board-${decBoardId}`;
       io.to(room).emit('commentDeleted', { taskId, commentId });
     });
@@ -356,19 +400,28 @@ const setupSocket = (io) => {
     // Actionable Invitation events for Feature 1
     socket.on('invitationSent', (data) => {
       const { recipientId, notification } = data;
-      io.emit('invitationSent', { recipientId, notification });
+      // Direct emit instead of global broadcast
+      emitToUser(recipientId, 'invitationSent', { recipientId, notification });
     });
 
-    socket.on('invitationAccepted', (data) => {
+    socket.on('invitationAccepted', async (data) => {
       const { boardId, taskId, notification } = data;
       const decBoardId = decryptId(boardId);
+      const decUserId = socket.userId;
+      if (!(await checkSocketBoardMembership(decUserId, decBoardId))) {
+        return;
+      }
       const room = `board-${decBoardId}`;
       io.to(room).emit('invitationAccepted', { taskId, notification });
     });
 
-    socket.on('invitationRejected', (data) => {
+    socket.on('invitationRejected', async (data) => {
       const { boardId, taskId, notification } = data;
       const decBoardId = decryptId(boardId);
+      const decUserId = socket.userId;
+      if (!(await checkSocketBoardMembership(decUserId, decBoardId))) {
+        return;
+      }
       const room = `board-${decBoardId}`;
       io.to(room).emit('invitationRejected', { taskId, notification });
     });

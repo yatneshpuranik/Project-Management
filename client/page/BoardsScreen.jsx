@@ -166,6 +166,7 @@ const BoardsScreen = () => {
   const [isMuted, setIsMuted] = useState(false)
   const [isCameraOn, setIsCameraOn] = useState(false)
   const [isScreenSharing, setIsScreenSharing] = useState(false)
+  const [pendingInvitations, setPendingInvitations] = useState([])
 
   // Channels lists definitions
   const textChannels = currentBoard?.channels || ['general', 'development', 'testing', 'announcements']
@@ -205,10 +206,32 @@ const BoardsScreen = () => {
     }
   }, [boardId, boards])
 
+  const fetchPendingInvitations = async () => {
+    if (!boardId) return
+    try {
+      const res = await axiosInstance.get(`/boards/${boardId}/invitations`)
+      setPendingInvitations(res.data.invitations || [])
+    } catch (err) {
+      console.error('Failed to fetch pending invitations:', err)
+    }
+  }
+
+  const handleRevokeInvitation = async (notificationId) => {
+    if (!window.confirm('Are you sure you want to revoke this pending invitation?')) return
+    try {
+      await axiosInstance.delete(`/boards/${boardId}/invitations/${notificationId}`)
+      toast.success('Invitation revoked successfully.')
+      fetchPendingInvitations()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to revoke invitation.')
+    }
+  }
+
   useEffect(() => {
     if (boardId) {
       dispatch(fetchBoardById(boardId))
       dispatch(fetchTasksByBoard(boardId))
+      fetchPendingInvitations()
       // Reset voice state on switching board
       setActiveVoiceChannel(null)
       setVoiceChannelUsers({})
@@ -543,6 +566,18 @@ const BoardsScreen = () => {
       setIsInviteOpen(false)
     } catch (err) {
       toast.error(err || 'Failed to send invite.')
+    }
+  }
+
+  const handleSendInviteByEmail = async (emailToInvite) => {
+    try {
+      const res = await axiosInstance.post(`/boards/${boardId}/members`, { email: emailToInvite })
+      toast.success(res.data.message || 'Invitation email sent successfully.')
+      setInviteSearch('')
+      setIsInviteOpen(false)
+      dispatch(fetchBoardById(boardId))
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to send invite.')
     }
   }
 
@@ -1075,6 +1110,13 @@ const BoardsScreen = () => {
         </div>
       </header>
 
+      {currentBoard?.isArchived && (
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-300 font-bold flex items-center gap-2 shadow-lg flex-shrink-0">
+          <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+          <span>This workspace has been archived and is read-only. Dynamic editing features are restricted.</span>
+        </div>
+      )}
+
       {/* Tabs Content */}
       <div className="flex-1 min-h-0 overflow-hidden relative">
         {/* Tab 1: Dashboard */}
@@ -1154,7 +1196,17 @@ const BoardsScreen = () => {
                               </div>
                             ))
                           ) : inviteSearch.trim() ? (
-                            <div className="text-center py-6 text-xs text-slate-500">No users found.</div>
+                            <div className="text-center py-4 space-y-3">
+                              <p className="text-xs text-slate-500">No users found on WorkSync.</p>
+                              {/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteSearch.trim()) && (
+                                <button
+                                  onClick={() => handleSendInviteByEmail(inviteSearch.trim())}
+                                  className="px-4 py-2 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-xl text-xs transition cursor-pointer"
+                                >
+                                  Invite via Email
+                                </button>
+                              )}
+                            </div>
                           ) : (
                             <div className="text-center py-6 text-[11px] text-slate-500">Type name or email to search.</div>
                           )}
@@ -1218,6 +1270,54 @@ const BoardsScreen = () => {
                   ) : (
                     <div className="text-center py-6 text-xs text-slate-600 italic">
                       No other team members have joined this workspace yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* PENDING INVITATIONS SECTION */}
+              <div className="space-y-2 pt-4 border-t border-white/5">
+                <span className="text-[10px] uppercase font-bold text-slate-500 block tracking-widest">PENDING INVITATIONS ({pendingInvitations.length})</span>
+                <div className="space-y-2 max-h-[30vh] overflow-y-auto custom-scrollbar pr-1">
+                  {pendingInvitations.length > 0 ? (
+                    pendingInvitations.map((invite) => {
+                      const recipient = invite.recipient;
+                      const name = recipient?.name || 'Invited User';
+                      const email = recipient?.email || 'No Email';
+                      const isReg = recipient?.isRegistered;
+                      return (
+                        <div key={invite._id} className="p-3 bg-slate-900/30 border border-white/5 rounded-2xl flex justify-between items-center gap-3 animate-fade-in">
+                          <div className="flex items-center gap-3">
+                            <div className="h-8 w-8 rounded-full bg-slate-850 flex items-center justify-center border border-white/10 text-slate-400 font-bold text-[10px]">
+                              {name.slice(0, 2).toUpperCase()}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="font-semibold text-white text-xs">{name}</p>
+                                <span className="bg-slate-800 text-[8px] px-1.5 py-0.5 rounded uppercase font-semibold text-slate-400">
+                                  {isReg ? 'Registered' : 'Pending Sign-up'}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-slate-500 mt-0.5">{email}</p>
+                            </div>
+                          </div>
+
+                          {/* Revoke Button */}
+                          {(isOwner || currentBoard?.userPermissions?.canInvite) && (
+                            <button
+                              type="button"
+                              onClick={() => handleRevokeInvitation(invite._id)}
+                              className="px-2.5 py-1 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500 text-rose-400 hover:text-white transition rounded-xl text-[10px] font-bold cursor-pointer"
+                            >
+                              Revoke
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-center py-4 text-xs text-slate-500 italic">
+                      No pending invitations.
                     </div>
                   )}
                 </div>

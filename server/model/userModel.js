@@ -42,6 +42,27 @@ const userSchema = new mongoose.Schema({
     },
     blockedAt: {
         type: Date
+    },
+    isVerified: {
+        type: Boolean,
+        default: false
+    },
+    isRegistered: {
+        type: Boolean,
+        default: true
+    },
+    verificationToken: {
+        type: String
+    },
+    verificationExpires: {
+        type: Date
+    },
+    invitationToken: {
+        type: String
+    },
+    invitedToBoard: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Board'
     }
 }, { timestamps: true });
 

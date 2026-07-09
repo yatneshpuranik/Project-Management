@@ -37,8 +37,10 @@ const Sidebar = ({ onLinkClick }) => {
     if (onLinkClick) onLinkClick()
   }
 
-  const myWorkspaces = boards.filter(b => (b.createdBy?._id || b.createdBy || '').toString() === currentUserId)
-  const joinedWorkspaces = boards.filter(b => (b.createdBy?._id || b.createdBy || '').toString() !== currentUserId)
+  const activeBoards = boards.filter(b => !b.isArchived)
+  const myWorkspaces = activeBoards.filter(b => (b.createdBy?._id || b.createdBy || '').toString() === currentUserId)
+  const joinedWorkspaces = activeBoards.filter(b => (b.createdBy?._id || b.createdBy || '').toString() !== currentUserId)
+  const archivedWorkspaces = boards.filter(b => b.isArchived)
 
   return (
     <div className="flex h-full flex-col justify-between">
@@ -181,6 +183,42 @@ const Sidebar = ({ onLinkClick }) => {
                 )}
               </div>
             </div>
+
+            {/* ARCHIVED WORKSPACES */}
+            {archivedWorkspaces.length > 0 && (
+              <div className="space-y-2 pt-2 border-t border-white/5">
+                <div className="flex items-center justify-between px-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">ARCHIVED</p>
+                  <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-slate-400 border border-white/5">{archivedWorkspaces.length}</span>
+                </div>
+                <div className="space-y-1.5 max-h-[25vh] overflow-y-auto custom-scrollbar">
+                  {archivedWorkspaces.map((board) => (
+                    <button
+                      key={board._id}
+                      type="button"
+                      onClick={() => handleSelectBoard(board._id)}
+                      className={`relative w-full flex flex-col items-start gap-1 rounded-xl px-3.5 py-3 text-left text-xs transition border border-transparent ${
+                        activeBoardId === board._id
+                          ? 'text-white'
+                          : 'text-slate-500 hover:text-slate-200 hover:bg-white/5'
+                      }`}
+                    >
+                      {activeBoardId === board._id && (
+                        <motion.span
+                          layoutId="activeWorkspaceNav"
+                          className="absolute inset-0 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] rounded-xl z-0"
+                          transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                        />
+                      )}
+                      <span className="font-semibold truncate w-full relative z-10 flex items-center justify-between gap-1.5">
+                        <span className="truncate">{board.title}</span>
+                        <span className="shrink-0 text-[8px] bg-slate-800 text-slate-500 px-1 py-0.5 rounded uppercase font-bold">Archived</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

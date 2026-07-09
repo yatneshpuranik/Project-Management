@@ -39,6 +39,8 @@ const TaskDetailsDrawer = ({ taskId, boardId, isOpen, onClose }) => {
   const [dueDate, setDueDate] = useState('');
   const [assignedTo, setAssignedTo] = useState('');
   const [openContribution, setOpenContribution] = useState(false);
+  const [labels, setLabels] = useState([]);
+  const [labelInput, setLabelInput] = useState('');
 
   const isOwner = useMemo(() => {
     if (!currentBoard) return false;
@@ -106,6 +108,8 @@ const TaskDetailsDrawer = ({ taskId, boardId, isOpen, onClose }) => {
       setDueDate(taskData.deadline || taskData.dueDate ? new Date(taskData.deadline || taskData.dueDate).toISOString().split('T')[0] : '');
       setAssignedTo(taskData.assignedTo?._id || taskData.assignedTo || '');
       setOpenContribution(taskData.openContribution || false);
+      setLabels(taskData.labels || []);
+      setLabelInput('');
     } catch (err) {
       console.error('Failed to fetch task details in drawer:', err);
       toast.error('Could not load task details.');
@@ -137,6 +141,7 @@ const TaskDetailsDrawer = ({ taskId, boardId, isOpen, onClose }) => {
         setDueDate(data.task.deadline || data.task.dueDate ? new Date(data.task.deadline || data.task.dueDate).toISOString().split('T')[0] : '');
         setAssignedTo(data.task.assignedTo?._id || data.task.assignedTo || '');
         setOpenContribution(data.task.openContribution || false);
+        setLabels(data.task.labels || []);
       }
     };
 
@@ -268,6 +273,7 @@ const TaskDetailsDrawer = ({ taskId, boardId, isOpen, onClose }) => {
         data.dueDate = dueDate || undefined;
         data.assignedTo = assignedTo || undefined;
         data.openContribution = openContribution;
+        data.labels = labels;
       }
 
       const resultAction = await dispatch(updateTask({ taskId, data }));
@@ -556,6 +562,53 @@ const TaskDetailsDrawer = ({ taskId, boardId, isOpen, onClose }) => {
                       }`}
                     />
                   </div>
+                </div>
+
+                {/* Labels section */}
+                <div className="space-y-3 pt-2">
+                  <label className="block text-xs text-slate-400 font-bold uppercase tracking-wider">Labels</label>
+                  <div className="flex flex-wrap gap-1.5 min-h-[24px]">
+                    {labels.map((lbl, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1 rounded bg-slate-805 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-200 border border-white/5"
+                      >
+                        {lbl}
+                        {isOwner && (
+                          <button
+                            type="button"
+                            onClick={() => setLabels(labels.filter((_, i) => i !== idx))}
+                            className="text-slate-500 hover:text-slate-355 font-bold ml-0.5 cursor-pointer"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                  {isOwner && (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="New label..."
+                        value={labelInput}
+                        onChange={(e) => setLabelInput(e.target.value)}
+                        className="rounded-xl border border-white/10 bg-slate-950 px-3.5 py-2 text-xs text-white placeholder-slate-500 outline-none focus:border-sky-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (labelInput.trim() && !labels.includes(labelInput.trim())) {
+                            setLabels([...labels, labelInput.trim()]);
+                            setLabelInput('');
+                          }
+                        }}
+                        className="px-3.5 py-2 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-xl text-xs transition cursor-pointer"
+                      >
+                        Add Label
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Open Contribution Toggle for Owner */}

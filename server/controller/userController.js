@@ -6,10 +6,12 @@ import Task from '../model/task.js';
 import AuditLog from '../model/auditLog.js';
 import { encryptUserIds, encryptId, decryptId } from '../utils/idCrypt.js';
 import mongoose from 'mongoose';
+import crypto from 'crypto';
+import { sendVerificationEmail, sendInvitationStatusEmail } from '../utils/emailService.js';
 
 export const createUser = async (req, res) => {
     try {
-        const { name, email, password } = req.body;
+        const { name, email, password, invitationToken } = req.body;
 
         if (!name || !email || !password) {
             return res.status(400).json({
@@ -20,12 +22,149 @@ export const createUser = async (req, res) => {
 
         const normalizedEmail = email.toLowerCase().trim();
 
-        let user = await User.findOne({ email: normalizedEmail });
-        if (user) {
+        if (invitationToken) {
+            let user = await User.findOne({ invitationToken, isRegistered: false });
+            if (!user) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid invitation token or user already registered."
+                });
+            }
+            if (user.email !== normalizedEmail) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Email does not match the invitation email."
+                });
+            }
+            const hashedPassword = await bycrypt.hash(password, 10);
+            user.name = name;
+            user.password = hashedPassword;
+            user.isRegistered = true;
+            user.isVerified = true; // Invite link acts as verification
+            user.invitationToken = undefined;
+            
+            const boardId = user.invitedToBoard;
+            user.invitedToBoard = undefined;
+            await user.save();
+
+            // Auto-accept invitation
+            if (boardId) {
+                const board = await Board.findById(boardId);
+                if (board) {
+                    if (!board.members.some(m => m.toString() === user._id.toString())) {
+                        board.members.push(user._id);
+                        await board.save();
+                    }
+                    // Find pending board invite notification
+                    const Notification = mongoose.model('Notification');
+                    const inviteNotification = await Notification.findOne({
+                        recipient: user._id,
+                        boardId: boardId,
+                        type: 'board_invite',
+                        status: 'pending'
+                    });
+                    if (inviteNotification) {
+                        inviteNotification.status = 'accepted';
+                        await inviteNotification.save();
+
+                        // Notify owner
+                        const owner = await User.findById(board.createdBy);
+                        if (owner) {
+                            // Create acceptance notification for owner
+                            const approvalNotification = new Notification({
+                                recipient: board.createdBy,
+                                sender: user._id,
+                                senderName: user.name,
+                                type: 'board_invite',
+                                status: 'accepted',
+                                boardId: board._id,
+                                boardTitle: board.title,
+                                message: `${user.name} accepted your invitation to join workspace: "${board.title}"`,
+                            });
+                            await approvalNotification.save();
+                            
+                            // Send emails
+                            await sendInvitationStatusEmail('accepted', owner.email, owner.name, user.email, user.name, board.title);
+                            
+                            // Emit socket events
+                            try {
+                                const { emitToUser } = await import('../socket/socket.js');
+                                emitToUser(board.createdBy, 'invitationSent', {
+                                    recipientId: encryptId(board.createdBy),
+                                    notification: encryptUserIds(approvalNotification),
+                                });
+                            } catch (err) {
+                                console.error('Socket accept invite emit error:', err);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Log User Created Audit
+            await AuditLog.create({
+                action: 'User Registered via Invite',
+                actorId: user._id,
+                actorName: user.name,
+                details: `User registered via invitation for board: ${boardId}`,
+                ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || ''
+            }).catch(e => { });
+
+            const token = genToken(user._id);
+            const safeUser = user.toObject();
+            delete safeUser.password;
+
+            res.cookie("token", token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+                maxAge: 24 * 60 * 60 * 1000
+            });
+
+            return res.status(201).json({
+                success: true,
+                message: "User created successfully",
+                user: encryptUserIds(safeUser),
+                token
+            });
+        }
+
+        if (normalizedEmail.endsWith('@asadmin.com') || normalizedEmail.endsWith('@admin.com')) {
             return res.status(400).json({
                 success: false,
-                message: "Email is already registered"
+                message: "Registration with this domain is not permitted."
             });
+        }
+
+        let user = await User.findOne({ email: normalizedEmail });
+        if (user) {
+            if (!user.isRegistered) {
+                return res.status(400).json({
+                    success: false,
+                    message: "This email has a pending invitation. Please use the link in the invitation email to register."
+                });
+            }
+            if (!user.isVerified) {
+                const newVerificationToken = crypto.randomBytes(32).toString('hex');
+                user.verificationToken = newVerificationToken;
+                user.verificationExpires = Date.now() + 24 * 60 * 60 * 1000;
+                user.name = name;
+                user.password = await bycrypt.hash(password, 10);
+                await user.save();
+
+                await sendVerificationEmail(user.email, user.name, newVerificationToken);
+
+                return res.status(201).json({
+                    success: true,
+                    isUnverified: true,
+                    message: "This account is already registered but has not been verified. A new verification email has been sent."
+                });
+            } else {
+                return res.status(400).json({
+                    success: false,
+                    message: "Email already registered. Please login."
+                });
+            }
         }
 
         let nameExists = await User.findOne({ name });
@@ -35,12 +174,19 @@ export const createUser = async (req, res) => {
                 message: "Username is already taken"
             });
         }
-        console.log("password => ", password);
+
         let hashedPassword = await bycrypt.hash(password, 10);
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+        const verificationExpires = Date.now() + 24 * 60 * 60 * 1000;
+
         user = await User.create({
             name,
             email: normalizedEmail,
-            password: hashedPassword
+            password: hashedPassword,
+            isVerified: false,
+            isRegistered: true,
+            verificationToken,
+            verificationExpires
         });
 
         // Log User Created Audit
@@ -48,26 +194,17 @@ export const createUser = async (req, res) => {
             action: 'User Created',
             actorId: user._id,
             actorName: user.name,
-            details: `User registered with email: ${user.email}`,
+            details: `User registered with email: ${user.email} (Pending verification)`,
             ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || ''
         }).catch(e => { });
 
-        const token = genToken(user._id);
-        const safeUser = user.toObject();
-        delete safeUser.password;
-
-        res.cookie("token", token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-            maxAge: 24 * 60 * 60 * 1000
-        });
+        // Send verification email
+        await sendVerificationEmail(user.email, user.name, verificationToken);
 
         return res.status(201).json({
             success: true,
-            message: "User created successfully",
-            user: encryptUserIds(safeUser),
-            token
+            isUnverified: true,
+            message: "Registration successful! Please check your email to verify your account."
         });
 
     } catch (err) {
@@ -138,6 +275,14 @@ export const loginUser = async (req, res) => {
             return res.status(401).json({
                 success: false,
                 message: "Invalid credentials"
+            });
+        }
+
+        if (!user.isVerified) {
+            return res.status(403).json({
+                success: false,
+                isUnverified: true,
+                message: "Please verify your email."
             });
         }
 
@@ -252,7 +397,7 @@ export const getAllUsers = async (req, res) => {
         if (!isAdminRequester) {
             query.role = { $ne: 'ADMIN' };
         }
-        const users = await User.find(query).select('-password');
+        const users = await User.find(query).select('-password -verificationToken -verificationExpires -invitationToken');
 
         return res.status(200).json({
             message: "Users retrieved successfully",
@@ -268,7 +413,7 @@ export const getAllUsers = async (req, res) => {
 
 export const getCurrentUser = async (req, res) => {
     try {
-        const user = await User.findById(req.userId).select('-password');
+        const user = await User.findById(req.userId).select('-password -verificationToken -verificationExpires -invitationToken');
 
         if (!user) {
             return res.status(404).json({
@@ -293,7 +438,7 @@ export const getUserByID = async (req, res) => {
         if (!mongoose.Types.ObjectId.isValid(id)) {
             return res.status(400).json({ message: 'Invalid user ID format' });
         }
-        const user = await User.findById(id);
+        const user = await User.findById(id).select('-password -verificationToken -verificationExpires -invitationToken');
 
         if (!user) {
             return res.status(404).json({
@@ -520,6 +665,10 @@ export const promoteUser = async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
 
+        if (user.email === 'yatneshpuranik@asadmin.com') {
+            return res.status(400).json({ success: false, message: 'Cannot modify platform role of the permanent administrator account' });
+        }
+
         user.role = 'ADMIN';
         await user.save();
 
@@ -568,6 +717,10 @@ export const demoteUser = async (req, res) => {
         const user = await User.findById(userId);
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        if (user.email === 'yatneshpuranik@asadmin.com') {
+            return res.status(400).json({ success: false, message: 'Cannot modify platform role of the permanent administrator account' });
         }
 
         if (user.email && user.email.endsWith('@admin.com')) {
@@ -659,7 +812,7 @@ export const updatePresence = async (req, res) => {
 export const updateProfile = async (req, res) => {
     try {
         const userId = req.userId;
-        const { name, username, password } = req.body;
+        const { name, username, email, password } = req.body;
 
         if (!name || !name.trim()) {
             return res.status(400).json({ success: false, message: 'Name is required' });
@@ -668,6 +821,11 @@ export const updateProfile = async (req, res) => {
         const user = await User.findById(userId);
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        // Prevent changing admin email
+        if (user.email === 'yatneshpuranik@asadmin.com' && email && email.toLowerCase().trim() !== user.email) {
+            return res.status(400).json({ success: false, message: 'Cannot modify email of the permanent administrator account' });
         }
 
         user.name = name.trim();
@@ -681,19 +839,133 @@ export const updateProfile = async (req, res) => {
             user.username = cleanUsername;
         }
 
+        let emailVerificationNeeded = false;
+        let newVerificationToken = '';
+
+        if (email && email.trim()) {
+            const normalizedEmail = email.toLowerCase().trim();
+            if (normalizedEmail !== user.email) {
+                if (normalizedEmail.endsWith('@asadmin.com') || normalizedEmail.endsWith('@admin.com')) {
+                    return res.status(400).json({ success: false, message: 'Registration or use of this domain is not permitted.' });
+                }
+                const emailExists = await User.findOne({ email: normalizedEmail, _id: { $ne: userId } });
+                if (emailExists) {
+                    return res.status(400).json({ success: false, message: 'Email is already in use' });
+                }
+                user.email = normalizedEmail;
+                user.isVerified = false;
+                newVerificationToken = crypto.randomBytes(32).toString('hex');
+                user.verificationToken = newVerificationToken;
+                user.verificationExpires = Date.now() + 24 * 60 * 60 * 1000;
+                emailVerificationNeeded = true;
+            }
+        }
+
         if (password && password.trim()) {
             user.password = await bycrypt.hash(password.trim(), 10);
         }
 
         await user.save();
 
+        if (emailVerificationNeeded) {
+            await sendVerificationEmail(user.email, user.name, newVerificationToken);
+        }
+
         const safeUser = user.toObject();
         delete safeUser.password;
 
         return res.status(200).json({
             success: true,
-            message: 'Profile updated successfully',
+            message: emailVerificationNeeded 
+                ? 'Profile updated successfully. A verification email has been sent to your new email address.'
+                : 'Profile updated successfully',
+            emailVerificationNeeded,
             user: encryptUserIds(safeUser)
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+export const verifyEmail = async (req, res) => {
+    try {
+        const { token } = req.query;
+        if (!token) {
+            return res.status(400).json({ success: false, message: 'Verification token is required.' });
+        }
+
+        const userByToken = await User.findOne({ verificationToken: token });
+
+        console.log('--- Verification Lookup ---');
+        console.log('Incoming token:', token);
+        console.log('Stored verification token:', userByToken?.verificationToken || 'none');
+        console.log('Expiry:', userByToken?.verificationExpires || 'none');
+        console.log('Current Time:', new Date());
+        console.log('Matched user id:', userByToken?._id || 'none');
+
+        if (!userByToken) {
+            console.log('Reason for lookup failure: No user found with the given verification token (token has already been used/cleared or is invalid).');
+            return res.status(410).json({ success: false, message: 'Verification link already used.' });
+        }
+
+        const isExpired = userByToken.verificationExpires && new Date(userByToken.verificationExpires) <= new Date();
+        if (isExpired) {
+            console.log('Reason for lookup failure: Verification token has expired.');
+            return res.status(410).json({ success: false, message: 'Verification link already used.' });
+        }
+
+        const user = userByToken;
+        user.isVerified = true;
+        user.verificationToken = undefined;
+        user.verificationExpires = undefined;
+        await user.save();
+
+        // Audit Log
+        await AuditLog.create({
+            action: 'Email Verified',
+            actorId: user._id,
+            actorName: user.name,
+            details: `User email verified: ${user.email}`,
+            ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || ''
+        }).catch(e => { });
+
+        return res.status(200).json({
+            success: true,
+            message: 'Email verified successfully! You can now log in.'
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+export const resendVerification = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({ success: false, message: 'Email address is required.' });
+        }
+
+        const normalizedEmail = email.toLowerCase().trim();
+        const user = await User.findOne({ email: normalizedEmail });
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User with this email not found.' });
+        }
+
+        if (user.isVerified) {
+            return res.status(400).json({ success: false, message: 'This account is already verified.' });
+        }
+
+        const token = crypto.randomBytes(32).toString('hex');
+        user.verificationToken = token;
+        user.verificationExpires = Date.now() + 24 * 60 * 60 * 1000;
+        await user.save();
+
+        await sendVerificationEmail(user.email, user.name, token);
+
+        return res.status(200).json({
+            success: true,
+            message: 'Verification email resent successfully! Please check your inbox.'
         });
     } catch (err) {
         return res.status(500).json({ success: false, message: err.message });

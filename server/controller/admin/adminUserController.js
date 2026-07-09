@@ -249,6 +249,9 @@ export const deleteUser = async (req, res) => {
     }
 
     // Protect primary Admin
+    if (user.email === 'yatneshpuranik@asadmin.com' || (user.email && user.email.endsWith('@asadmin.com'))) {
+      return res.status(400).json({ message: 'Cannot delete the permanent administrator account' });
+    }
     if (user.email && user.email.endsWith('@admin.com')) {
       return res.status(400).json({ message: 'Cannot delete an Admin account' });
     }
