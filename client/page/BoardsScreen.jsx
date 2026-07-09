@@ -114,7 +114,7 @@ const BoardsScreen = () => {
   const commentsTaskId = searchParams.get('comments')
   const { boards, currentBoard } = useSelector((state) => state.boards)
   const { tasks, onlineUsers } = useSelector((state) => state.tasks)
-  
+
   const currentUserId = localStorage.getItem('userId')
   const currentUserName = localStorage.getItem('userName') || 'You'
 
@@ -159,7 +159,7 @@ const BoardsScreen = () => {
   // Inline Chat/Voice states
   const [activeChatChannel, setActiveChatChannel] = useState('general')
   const [unreadCounts, setUnreadCounts] = useState({})
-  
+
   // Realtime Voice Call States
   const [activeVoiceChannel, setActiveVoiceChannel] = useState(null)
   const [voiceChannelUsers, setVoiceChannelUsers] = useState({})
@@ -182,17 +182,17 @@ const BoardsScreen = () => {
         try {
           const taskPromises = boards.map(b => axiosInstance.get(`/tasks/board/${b._id}`))
           const activityPromises = boards.map(b => axiosInstance.get(`/activity/board/${b._id}`))
-          
+
           const [taskResponses, activityResponses] = await Promise.all([
             Promise.all(taskPromises),
             Promise.all(activityPromises)
           ])
-          
+
           const allTasks = taskResponses.flatMap(res => res.data.tasks || [])
           const allActivities = activityResponses.flatMap(res => res.data.activities || [])
-          
+
           allActivities.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-          
+
           setGlobalTasks(allTasks)
           setGlobalActivities(allActivities.slice(0, 15))
         } catch (err) {
@@ -628,16 +628,16 @@ const BoardsScreen = () => {
     const today = new Date()
     const year = today.getFullYear()
     const month = today.getMonth()
-    
+
     const firstDay = new Date(year, month, 1)
     const lastDay = new Date(year, month + 1, 0)
-    
+
     const startDate = new Date(firstDay)
     startDate.setDate(startDate.getDate() - startDate.getDay())
-    
+
     const endDate = new Date(lastDay)
     endDate.setDate(endDate.getDate() + (6 - endDate.getDay()))
-    
+
     const days = []
     const temp = new Date(startDate)
     while (temp <= endDate) {
@@ -652,8 +652,8 @@ const BoardsScreen = () => {
       if (!t.dueDate) return false
       const dDate = new Date(t.dueDate)
       return dDate.getDate() === day.getDate() &&
-             dDate.getMonth() === day.getMonth() &&
-             dDate.getFullYear() === day.getFullYear()
+        dDate.getMonth() === day.getMonth() &&
+        dDate.getFullYear() === day.getFullYear()
     })
   }
 
@@ -678,7 +678,7 @@ const BoardsScreen = () => {
             <div className="absolute inset-0 bg-grid opacity-[0.04] pointer-events-none" />
             <div className="absolute -top-40 -left-40 h-80 w-80 rounded-full bg-violet-500/10 blur-[100px] pointer-events-none" />
             <div className="absolute -bottom-40 -right-40 h-80 w-80 rounded-full bg-sky-500/10 blur-[100px] pointer-events-none" />
-            
+
             <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-400">Workspace Dashboard</p>
@@ -687,7 +687,7 @@ const BoardsScreen = () => {
                   Review available board workspaces, view team participation, and create new collaborative spaces.
                 </p>
               </div>
-              
+
               <button
                 onClick={() => setIsCreateModalOpen(true)}
                 className="btn-primary self-start lg:self-auto bg-sky-500 hover:bg-violet-600 text-slate-955 hover:text-white flex items-center gap-1.5 transition shadow-lg hover:shadow-violet-500/25"
@@ -800,7 +800,7 @@ const BoardsScreen = () => {
                   <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-450">Discover Workspaces</h2>
                   <p className="text-[10.5px] text-slate-500">Search and join other public or private workspaces on WorkSync.</p>
                 </div>
-                
+
                 <div className="flex flex-wrap gap-2 w-full md:w-auto">
                   <input
                     value={discoveryQuery}
@@ -885,7 +885,7 @@ const BoardsScreen = () => {
             <div className="premium-modal-container relative !animate-none !max-w-[580px] w-full h-auto">
               <h3 className="text-base font-semibold text-white mb-2">Create New Workspace</h3>
               <p className="text-[11px] text-slate-450 mb-4">Set up board details.</p>
-              
+
               <form onSubmit={handleCreateBoard} className="space-y-4">
                 <div>
                   <label className="block text-xs text-slate-300 font-semibold mb-1">Title</label>
@@ -1014,19 +1014,17 @@ const BoardsScreen = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <span className={`text-[8.5px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                          t.priority === 'High' ? 'bg-rose-500/10 text-rose-400' :
-                          t.priority === 'Medium' ? 'bg-amber-500/10 text-amber-400' :
-                          'bg-slate-800 text-slate-400'
-                        }`}>
+                        <span className={`text-[8.5px] font-bold uppercase px-1.5 py-0.5 rounded ${t.priority === 'High' ? 'bg-rose-500/10 text-rose-400' :
+                            t.priority === 'Medium' ? 'bg-amber-500/10 text-amber-400' :
+                              'bg-slate-800 text-slate-400'
+                          }`}>
                           {t.priority}
                         </span>
-                        <span className={`text-[8.5px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                          t.status === 'Done' ? 'bg-emerald-500/10 text-emerald-400' :
-                          t.status === 'Review' ? 'bg-amber-500/10 text-amber-400' :
-                          t.status === 'In Progress' ? 'bg-sky-500/10 text-sky-400' :
-                          'bg-slate-800 text-slate-400'
-                        }`}>
+                        <span className={`text-[8.5px] font-bold uppercase px-1.5 py-0.5 rounded ${t.status === 'Done' ? 'bg-emerald-500/10 text-emerald-400' :
+                            t.status === 'Review' ? 'bg-amber-500/10 text-amber-400' :
+                              t.status === 'In Progress' ? 'bg-sky-500/10 text-sky-400' :
+                                'bg-slate-800 text-slate-400'
+                          }`}>
                           {t.status}
                         </span>
                       </div>
@@ -1066,11 +1064,10 @@ const BoardsScreen = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-1.5 text-xs font-bold rounded-lg transition ${
-                activeTab === tab.id
+              className={`px-4 py-1.5 text-xs font-bold rounded-lg transition ${activeTab === tab.id
                   ? 'bg-sky-500 text-slate-950 shadow-md shadow-sky-500/10'
                   : 'text-slate-400 hover:text-white hover:bg-slate-900/30'
-              }`}
+                }`}
             >
               {tab.label}
             </button>
@@ -1080,7 +1077,7 @@ const BoardsScreen = () => {
 
       {/* Tabs Content */}
       <div className="flex-1 min-h-0 overflow-hidden relative">
-              {/* Tab 1: Dashboard */}
+        {/* Tab 1: Dashboard */}
         {activeTab === 'dashboard' && (
           <div className="h-full min-h-0 flex overflow-hidden gap-4">
             <div className="flex-1 min-w-0">
@@ -1099,7 +1096,7 @@ const BoardsScreen = () => {
             <div className="md:col-span-2 space-y-6">
               <div className="flex items-center justify-between border-b border-white/10 pb-3">
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider">Workspace Directory</h3>
-                
+
                 {/* Invite Dropdown Trigger */}
                 {(isOwner || currentBoard?.userPermissions?.canInvite) && (
                   <div className="relative">
@@ -1238,7 +1235,7 @@ const BoardsScreen = () => {
                 {(isOwner || currentBoard?.userPermissions?.canTransferOwnership) && (
                   <form onSubmit={handleTransfer} className="space-y-3 pt-2">
                     <label className="block text-[9px] uppercase font-bold text-slate-400">Transfer Ownership</label>
-                    
+
                     {!selectedTransferUser ? (
                       <div className="relative">
                         <input
@@ -1365,11 +1362,10 @@ const BoardsScreen = () => {
                             setUnreadCounts((prev) => ({ ...prev, [lowerCh]: 0 }))
                             axiosInstance.post(`/boards/${boardId}/chat/read`, { channel: lowerCh }).catch(console.error)
                           }}
-                          className={`w-full flex items-center justify-between py-1.5 px-2.5 rounded-lg text-xs font-semibold text-left transition ${
-                            activeChatChannel?.toLowerCase() === lowerCh
+                          className={`w-full flex items-center justify-between py-1.5 px-2.5 rounded-lg text-xs font-semibold text-left transition ${activeChatChannel?.toLowerCase() === lowerCh
                               ? 'bg-sky-500/15 text-sky-400 border border-sky-500/20 shadow-inner'
                               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/30'
-                          }`}
+                            }`}
                         >
                           <span className="flex items-center gap-1.5">
                             <span>#</span>
@@ -1395,11 +1391,10 @@ const BoardsScreen = () => {
                         <div key={ch} className="space-y-0.5">
                           <button
                             onClick={() => handleJoinVoice(ch)}
-                            className={`w-full flex items-center justify-between py-1.5 px-2.5 rounded-lg text-xs font-semibold text-left transition ${
-                              isCallActive
+                            className={`w-full flex items-center justify-between py-1.5 px-2.5 rounded-lg text-xs font-semibold text-left transition ${isCallActive
                                 ? 'bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/25'
                                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/30'
-                            }`}
+                              }`}
                           >
                             <span className="flex items-center gap-1.5">
                               <span>🔊</span>
@@ -1442,31 +1437,28 @@ const BoardsScreen = () => {
                     </p>
                     <p className="text-[10px] font-bold text-white truncate mt-0.5">#{activeVoiceChannel.replace('-voice', '')}</p>
                   </div>
-                  
+
                   <div className="grid grid-cols-4 gap-1">
                     <button
                       onClick={handleToggleMute}
-                      className={`p-1.5 rounded bg-slate-900 border border-white/5 hover:border-slate-800 text-xs flex items-center justify-center ${
-                        isMuted ? 'text-rose-400 bg-rose-500/10' : 'text-slate-300'
-                      }`}
+                      className={`p-1.5 rounded bg-slate-900 border border-white/5 hover:border-slate-800 text-xs flex items-center justify-center ${isMuted ? 'text-rose-400 bg-rose-500/10' : 'text-slate-300'
+                        }`}
                       title={isMuted ? 'Unmute microphone' : 'Mute microphone'}
                     >
                       {isMuted ? <MuteIcon /> : <MicIcon />}
                     </button>
                     <button
                       onClick={handleToggleCamera}
-                      className={`p-1.5 rounded bg-slate-900 border border-white/5 hover:border-slate-800 text-xs flex items-center justify-center ${
-                        isCameraOn ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-300'
-                      }`}
+                      className={`p-1.5 rounded bg-slate-900 border border-white/5 hover:border-slate-800 text-xs flex items-center justify-center ${isCameraOn ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-300'
+                        }`}
                       title={isCameraOn ? 'Turn camera off' : 'Turn camera on'}
                     >
                       <CameraIcon />
                     </button>
                     <button
                       onClick={handleToggleScreenShare}
-                      className={`p-1.5 rounded bg-slate-900 border border-white/5 hover:border-slate-800 text-xs flex items-center justify-center ${
-                        isScreenSharing ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-300'
-                      }`}
+                      className={`p-1.5 rounded bg-slate-900 border border-white/5 hover:border-slate-800 text-xs flex items-center justify-center ${isScreenSharing ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-300'
+                        }`}
                       title={isScreenSharing ? 'Stop screen sharing' : 'Share screen'}
                     >
                       <ScreenIcon />

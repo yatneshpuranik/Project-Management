@@ -16,7 +16,7 @@ const ActivityPanel = ({ activities = [], onlineUsers = [] }) => {
 
       {/* Main Content (Scrollable) */}
       <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
-        
+
         {/* Section: Timeline */}
         <div className="space-y-3">
           <div className="flex items-center justify-between text-[11px] text-slate-400">
@@ -68,9 +68,8 @@ const ActivityPanel = ({ activities = [], onlineUsers = [] }) => {
                     <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-sky-500/10 text-sky-400 text-xs font-bold border border-sky-500/15">
                       {user.userName?.charAt(0).toUpperCase() || 'U'}
                     </span>
-                    <span className={`absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-slate-950 ${
-                      user.status === 'Typing...' ? 'bg-sky-400 animate-pulse' : 'bg-emerald-500'
-                    }`}></span>
+                    <span className={`absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-slate-950 ${user.status === 'Typing...' ? 'bg-sky-400 animate-pulse' : 'bg-emerald-500'
+                      }`}></span>
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex justify-between items-center gap-2">
