@@ -1050,15 +1050,15 @@ const BoardsScreen = () => {
                       </div>
                       <div className="flex items-center gap-1.5 flex-shrink-0">
                         <span className={`text-[8.5px] font-bold uppercase px-1.5 py-0.5 rounded ${t.priority === 'High' ? 'bg-rose-500/10 text-rose-400' :
-                            t.priority === 'Medium' ? 'bg-amber-500/10 text-amber-400' :
-                              'bg-slate-800 text-slate-400'
+                          t.priority === 'Medium' ? 'bg-amber-500/10 text-amber-400' :
+                            'bg-slate-800 text-slate-400'
                           }`}>
                           {t.priority}
                         </span>
                         <span className={`text-[8.5px] font-bold uppercase px-1.5 py-0.5 rounded ${t.status === 'Done' ? 'bg-emerald-500/10 text-emerald-400' :
-                            t.status === 'Review' ? 'bg-amber-500/10 text-amber-400' :
-                              t.status === 'In Progress' ? 'bg-sky-500/10 text-sky-400' :
-                                'bg-slate-800 text-slate-400'
+                          t.status === 'Review' ? 'bg-amber-500/10 text-amber-400' :
+                            t.status === 'In Progress' ? 'bg-sky-500/10 text-sky-400' :
+                              'bg-slate-800 text-slate-400'
                           }`}>
                           {t.status}
                         </span>
@@ -1100,8 +1100,8 @@ const BoardsScreen = () => {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-1.5 text-xs font-bold rounded-lg transition ${activeTab === tab.id
-                  ? 'bg-sky-500 text-slate-950 shadow-md shadow-sky-500/10'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-900/30'
+                ? 'bg-sky-500 text-slate-950 shadow-md shadow-sky-500/10'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900/30'
                 }`}
             >
               {tab.label}
@@ -1463,8 +1463,8 @@ const BoardsScreen = () => {
                             axiosInstance.post(`/boards/${boardId}/chat/read`, { channel: lowerCh }).catch(console.error)
                           }}
                           className={`w-full flex items-center justify-between py-1.5 px-2.5 rounded-lg text-xs font-semibold text-left transition ${activeChatChannel?.toLowerCase() === lowerCh
-                              ? 'bg-sky-500/15 text-sky-400 border border-sky-500/20 shadow-inner'
-                              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/30'
+                            ? 'bg-sky-500/15 text-sky-400 border border-sky-500/20 shadow-inner'
+                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/30'
                             }`}
                         >
                           <span className="flex items-center gap-1.5">
@@ -1492,8 +1492,8 @@ const BoardsScreen = () => {
                           <button
                             onClick={() => handleJoinVoice(ch)}
                             className={`w-full flex items-center justify-between py-1.5 px-2.5 rounded-lg text-xs font-semibold text-left transition ${isCallActive
-                                ? 'bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/25'
-                                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/30'
+                              ? 'bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/25'
+                              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/30'
                               }`}
                           >
                             <span className="flex items-center gap-1.5">

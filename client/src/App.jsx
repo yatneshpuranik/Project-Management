@@ -52,7 +52,7 @@ const ProfileScreenWrapper = ({ isSidebarOpen, closeSidebar }) => {
     return (
       <div className="flex flex-1 w-full overflow-hidden relative">
         {isSidebarOpen && (
-          <div 
+          <div
             onClick={closeSidebar}
             className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden transition-opacity duration-300"
           />
@@ -148,7 +148,7 @@ const App = () => {
           <Route path='/' element={<Home />} />
           <Route path='/login' element={user ? (user.role === 'ADMIN' ? <Navigate to='/admin' replace /> : <Navigate to='/boards' replace />) : <LoginScreen />} />
           <Route path='/verify-email' element={<VerifyEmailScreen />} />
-          
+
           {/* Protected Area Layout */}
           <Route
             element={
@@ -174,7 +174,7 @@ const App = () => {
               </ProtectedRoute>
             }
           />
- 
+
           {/* Admin Protected Area */}
           <Route
             element={

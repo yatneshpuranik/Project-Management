@@ -57,7 +57,7 @@ const Navbar = ({ toggleSidebar }) => {
     setIsSearchFocused(false);
     setSearchQuery('');
     setSearchResults(null);
-    
+
     if (selected.type === 'workspace') {
       navigate(`/boards/${selected.data._id}`);
     } else if (selected.type === 'task') {
@@ -161,8 +161,7 @@ const Navbar = ({ toggleSidebar }) => {
 
     const handleTaskAssigned = (data) => {
       toast.success(
-        `You have been assigned a task: "${data.taskTitle}" by ${data.assignedBy}. Deadline: ${
-          data.deadline ? new Date(data.deadline).toLocaleDateString() : 'None'
+        `You have been assigned a task: "${data.taskTitle}" by ${data.assignedBy}. Deadline: ${data.deadline ? new Date(data.deadline).toLocaleDateString() : 'None'
         }`
       );
       if (data.notification) {
@@ -288,7 +287,7 @@ const Navbar = ({ toggleSidebar }) => {
       if (currentBoard?._id === boardId) {
         dispatch(fetchTasksByBoard(boardId));
       }
-      
+
       // Reload boards list
       dispatch(fetchBoards());
 
@@ -351,7 +350,7 @@ const Navbar = ({ toggleSidebar }) => {
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/95 backdrop-blur-xl shadow-xl shadow-black/20 h-[73px] flex items-center">
       <div className="w-full flex items-center justify-between gap-4 px-4 py-3 md:px-6 lg:px-8">
-        
+
         {/* Left Side: Hamburger (Mobile) + Brand */}
         <div className="flex items-center gap-3">
           {user && (
@@ -363,7 +362,7 @@ const Navbar = ({ toggleSidebar }) => {
               <HiOutlineMenu className="h-5 w-5" />
             </button>
           )}
-          
+
           <Link to="/" className="flex items-center gap-3 group">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-lg shadow-sky-500/20 group-hover:scale-105 transition">
               <HiOutlineViewBoards className="h-5 w-5" />
@@ -405,11 +404,10 @@ const Navbar = ({ toggleSidebar }) => {
                         <div
                           key={idx}
                           onClick={() => handleSelectFlatResult(item)}
-                          className={`p-2.5 rounded-lg border cursor-pointer flex items-center justify-between transition gap-2 ${
-                            isSelected
+                          className={`p-2.5 rounded-lg border cursor-pointer flex items-center justify-between transition gap-2 ${isSelected
                               ? 'bg-sky-500/10 border-sky-500/30 shadow-[0_0_12px_rgba(56,189,248,0.06)]'
                               : 'border-transparent bg-slate-950/30 hover:border-white/10 hover:bg-slate-950/60'
-                          }`}
+                            }`}
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
                             {item.type === 'user' && (
@@ -441,9 +439,8 @@ const Navbar = ({ toggleSidebar }) => {
                               </p>
                             </div>
                           </div>
-                          <span className={`text-[8.5px] font-bold uppercase px-2 py-0.5 rounded flex-shrink-0 ${
-                            isSelected ? 'bg-sky-500 text-slate-950' : 'bg-slate-800 text-slate-400'
-                          }`}>
+                          <span className={`text-[8.5px] font-bold uppercase px-2 py-0.5 rounded flex-shrink-0 ${isSelected ? 'bg-sky-500 text-slate-950' : 'bg-slate-800 text-slate-400'
+                            }`}>
                             {item.type}
                           </span>
                         </div>
@@ -497,17 +494,15 @@ const Navbar = ({ toggleSidebar }) => {
                     <div className="flex border-b border-white/5 pb-2 mb-3 justify-around">
                       <button
                         onClick={() => setActiveTab('inbox')}
-                        className={`pb-1 text-xs font-semibold transition ${
-                          activeTab === 'inbox' ? 'text-sky-400 border-b-2 border-sky-400' : 'text-slate-400 hover:text-slate-200'
-                        }`}
+                        className={`pb-1 text-xs font-semibold transition ${activeTab === 'inbox' ? 'text-sky-400 border-b-2 border-sky-400' : 'text-slate-400 hover:text-slate-200'
+                          }`}
                       >
                         Inbox ({pendingCount})
                       </button>
                       <button
                         onClick={() => setActiveTab('feed')}
-                        className={`pb-1 text-xs font-semibold transition ${
-                          activeTab === 'feed' ? 'text-sky-400 border-b-2 border-sky-400' : 'text-slate-400 hover:text-slate-200'
-                        }`}
+                        className={`pb-1 text-xs font-semibold transition ${activeTab === 'feed' ? 'text-sky-400 border-b-2 border-sky-400' : 'text-slate-400 hover:text-slate-200'
+                          }`}
                       >
                         Feed ({notifications.length})
                       </button>
@@ -572,15 +567,14 @@ const Navbar = ({ toggleSidebar }) => {
                                                     ? 'Role Change'
                                                     : 'Notification'}
                                     </p>
-                                    <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded capitalize ${
-                                      notif.type === 'task_assign'
+                                    <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded capitalize ${notif.type === 'task_assign'
                                         ? 'bg-sky-500/10 text-sky-400'
                                         : notif.status === 'pending'
                                           ? 'bg-amber-500/10 text-amber-400'
                                           : notif.status === 'accepted'
                                             ? 'bg-emerald-500/10 text-emerald-400'
                                             : 'bg-rose-500/10 text-rose-400'
-                                    }`}>
+                                      }`}>
                                       {notif.type === 'task_assign' ? 'Assigned' : notif.status}
                                     </span>
                                   </div>
@@ -726,14 +720,14 @@ const Navbar = ({ toggleSidebar }) => {
               </AnimatePresence>
             </div>
           )}
-          
+
           {user ? (
             (() => {
               const cleanName = (user?.name || userName || 'User').replace(/\s+(User|Admin)$/i, '');
               return (
                 <div className="relative" ref={profileRef}>
-                  <div 
-                    className="flex cursor-pointer items-center gap-2 rounded-2xl border border-white/10 bg-slate-900 px-3 py-1.5 transition hover:bg-slate-800" 
+                  <div
+                    className="flex cursor-pointer items-center gap-2 rounded-2xl border border-white/10 bg-slate-900 px-3 py-1.5 transition hover:bg-slate-800"
                     onClick={() => setIsProfileOpen(!isProfileOpen)}
                   >
                     <img

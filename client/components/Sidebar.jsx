@@ -79,10 +79,9 @@ const Sidebar = ({ onLinkClick }) => {
                   to={item.to}
                   onClick={handleClick}
                   className={
-                    `relative flex items-center gap-3 rounded-xl px-3.5 py-3 text-xs font-semibold transition border border-transparent ${
-                      isCustomActive 
-                        ? 'text-sky-400' 
-                        : 'text-slate-400 hover:text-slate-100 hover:bg-white/5'
+                    `relative flex items-center gap-3 rounded-xl px-3.5 py-3 text-xs font-semibold transition border border-transparent ${isCustomActive
+                      ? 'text-sky-400'
+                      : 'text-slate-400 hover:text-slate-100 hover:bg-white/5'
                     }`
                   }
                 >
@@ -117,11 +116,10 @@ const Sidebar = ({ onLinkClick }) => {
                       key={board._id}
                       type="button"
                       onClick={() => handleSelectBoard(board._id)}
-                      className={`relative w-full flex flex-col items-start gap-1 rounded-xl px-3.5 py-3 text-left text-xs transition border border-transparent ${
-                        activeBoardId === board._id
+                      className={`relative w-full flex flex-col items-start gap-1 rounded-xl px-3.5 py-3 text-left text-xs transition border border-transparent ${activeBoardId === board._id
                           ? 'text-white'
                           : 'text-slate-400 hover:text-slate-100 hover:bg-white/5'
-                      }`}
+                        }`}
                     >
                       {activeBoardId === board._id && (
                         <motion.span
@@ -157,11 +155,10 @@ const Sidebar = ({ onLinkClick }) => {
                       key={board._id}
                       type="button"
                       onClick={() => handleSelectBoard(board._id)}
-                      className={`relative w-full flex flex-col items-start gap-1 rounded-xl px-3.5 py-3 text-left text-xs transition border border-transparent ${
-                        activeBoardId === board._id
+                      className={`relative w-full flex flex-col items-start gap-1 rounded-xl px-3.5 py-3 text-left text-xs transition border border-transparent ${activeBoardId === board._id
                           ? 'text-white'
                           : 'text-slate-400 hover:text-slate-100 hover:bg-white/5'
-                      }`}
+                        }`}
                     >
                       {activeBoardId === board._id && (
                         <motion.span
@@ -197,11 +194,10 @@ const Sidebar = ({ onLinkClick }) => {
                       key={board._id}
                       type="button"
                       onClick={() => handleSelectBoard(board._id)}
-                      className={`relative w-full flex flex-col items-start gap-1 rounded-xl px-3.5 py-3 text-left text-xs transition border border-transparent ${
-                        activeBoardId === board._id
+                      className={`relative w-full flex flex-col items-start gap-1 rounded-xl px-3.5 py-3 text-left text-xs transition border border-transparent ${activeBoardId === board._id
                           ? 'text-white'
                           : 'text-slate-500 hover:text-slate-200 hover:bg-white/5'
-                      }`}
+                        }`}
                     >
                       {activeBoardId === board._id && (
                         <motion.span
